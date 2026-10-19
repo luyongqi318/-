@@ -575,7 +575,7 @@ function findSource(candidates: string[], normHeaders: string[], headers: string
 }
 
 export type Detection = {
-  entity: EntityKey;
+  entity: string;
   label: string;
   matched: number;
   total: number;
@@ -611,17 +611,21 @@ export function detectEntity(headers: string[]): Detection | null {
   return best;
 }
 
-export function importAuto(headers: string[], rows: Record<string, string>[]) {
-  const detection = detectEntity(headers);
-  if (!detection) return null;
-
-  const remapped = rows.map((row) => {
+export function remapRows(rows: Record<string, string>[], mapping: Record<string, string>): Record<string, string>[] {
+  return rows.map((row) => {
     const out: Record<string, string> = {};
-    for (const [canonical, source] of Object.entries(detection.mapping)) {
+    for (const [canonical, source] of Object.entries(mapping)) {
       out[canonical] = row[source] ?? "";
     }
     return out;
   });
+}
+
+export function importAuto(headers: string[], rows: Record<string, string>[]) {
+  const detection = detectEntity(headers);
+  if (!detection) return null;
+
+  const remapped = remapRows(rows, detection.mapping);
 
   const result = importRows(detection.entity, remapped);
   return {

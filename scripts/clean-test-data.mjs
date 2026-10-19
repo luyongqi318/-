@@ -9,7 +9,7 @@ const count = () => ({
 });
 console.log("before:", JSON.stringify(count()));
 
-db.prepare("DELETE FROM employees WHERE name LIKE '测试%' OR name LIKE 'CI%' OR name LIKE 'E2E%' OR name LIKE '自动%' OR emp_no LIKE 'DJJ-99%'").run();
+db.prepare("DELETE FROM employees WHERE name LIKE '测试%' OR name LIKE 'CI%' OR name LIKE 'E2E%' OR name LIKE '自动%' OR name LIKE 'AI员工%' OR emp_no LIKE 'DJJ-99%'").run();
 db.prepare("DELETE FROM jobs WHERE title LIKE '测试%' OR title LIKE 'E2E%'").run();
 db.prepare("DELETE FROM courses WHERE title LIKE '测试%' OR title LIKE '自动%'").run();
 db.prepare("DELETE FROM candidates WHERE name LIKE '自动%' OR name LIKE '测试%'").run();

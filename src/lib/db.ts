@@ -245,9 +245,98 @@ function migrate(db: DB): void {
     version = 2;
   }
 
+  if (version < 3) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS certificates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        number TEXT,
+        issued_at TEXT,
+        expires_at TEXT NOT NULL,
+        note TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_cert_expires ON certificates(expires_at);
+
+      CREATE TABLE IF NOT EXISTS dorm_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER NOT NULL,
+        building TEXT NOT NULL,
+        room_no TEXT NOT NULL,
+        bed_no TEXT,
+        fee REAL,
+        check_in TEXT,
+        check_out TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS agency_workers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        agency TEXT NOT NULL,
+        role TEXT,
+        daily_rate REAL,
+        start_date TEXT,
+        end_date TEXT,
+        status TEXT NOT NULL DEFAULT '在岗',
+        phone TEXT
+      );
+    `);
+    seedAdminTables(db);
+    version = 3;
+  }
+
   if (version !== current) {
     db.exec(`PRAGMA user_version = ${version}`);
   }
+}
+
+/** 行政台账的演示数据：只在新库或首次升级时写入。 */
+function seedAdminTables(db: DB): void {
+  const count = Number((db.prepare("SELECT COUNT(*) AS n FROM certificates").get() as { n: number }).n);
+  if (count > 0) return;
+
+  const today = new Date();
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const addDays = (n: number) => iso(new Date(today.getTime() + n * 86400000));
+
+  const staff = db
+    .prepare(
+      `SELECT e.id, e.name, e.position FROM employees e
+       WHERE e.status != '离职' AND (e.position LIKE '%厨师%' OR e.position LIKE '%服务%' OR e.position LIKE '%客房%')
+       ORDER BY e.id LIMIT 12`,
+    )
+    .all() as { id: number; name: string; position: string }[];
+
+  const offsets = [-18, 9, 21, 27, 58, 120, 210, -3, 44, 160, 300, 90];
+  const insCert = db.prepare(
+    "INSERT INTO certificates (employee_id, type, number, issued_at, expires_at, note) VALUES (?, ?, ?, ?, ?, ?)",
+  );
+  staff.forEach((person, index) => {
+    const type = person.position.includes("厨") ? "健康证 + 食品从业" : "健康证";
+    insCert.run(person.id, type, `JK${2026000 + person.id}`, addDays(-330), addDays(offsets[index % offsets.length]), "到期前 30 天需安排体检");
+  });
+
+  const dormStaff = db
+    .prepare("SELECT id, name FROM employees WHERE status != '离职' ORDER BY id LIMIT 9")
+    .all() as { id: number; name: string }[];
+  const insDorm = db.prepare(
+    "INSERT INTO dorm_assignments (employee_id, building, room_no, bed_no, fee, check_in, check_out) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  );
+  dormStaff.forEach((person, index) => {
+    insDorm.run(person.id, index < 5 ? "A 栋" : "B 栋", `20${(index % 4) + 1}`, `${(index % 4) + 1} 号床`, 300, addDays(-120 - index * 20), "");
+  });
+
+  const insAgency = db.prepare(
+    "INSERT INTO agency_workers (name, agency, role, daily_rate, start_date, end_date, status, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  );
+  const workers = [
+    ["刘建国", "上海锦程劳务", "宴会传菜", 260, addDays(-12), addDays(18), "在岗", "13900001001"],
+    ["陈美玲", "上海锦程劳务", "客房清洁", 240, addDays(-30), addDays(5), "在岗", "13900001002"],
+    ["王海涛", "浦东众信人力", "洗碗工", 230, addDays(-8), addDays(22), "在岗", "13900001003"],
+    ["李秀华", "浦东众信人力", "宴会服务", 250, addDays(-60), addDays(-4), "已离场", "13900001004"],
+    ["赵国庆", "上海锦程劳务", "搬运/布草", 260, addDays(-3), addDays(27), "在岗", "13900001005"],
+  ];
+  workers.forEach((w) => insAgency.run(...(w as [string, string, string, number, string, string, string, string])));
 }
 
 export function getDb(): DB {

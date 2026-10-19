@@ -13,6 +13,7 @@ const TITLES: Record<string, string> = {
   "/scheduling": "排班与考勤",
   "/performance": "绩效评估",
   "/approvals": "审批中心",
+  "/admin": "行政台账",
   "/messages": "邮件中心",
   "/audit": "审计日志",
   "/agent": "AI 智能体",
