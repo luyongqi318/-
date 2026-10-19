@@ -1,4 +1,4 @@
-import { Database, KeyRound, ShieldCheck } from "lucide-react";
+import { Database, HardDriveDownload, KeyRound, ShieldCheck } from "lucide-react";
 import { AgentSettingsForm } from "@/components/AgentSettingsForm";
 import { PageHeader } from "@/components/ui";
 import { getAgentConfig } from "@/lib/settings";
@@ -76,6 +76,21 @@ export default function SettingsPage() {
               常见组合：<br />
               DeepSeek：https://api.deepseek.com · deepseek-chat<br />
               OpenAI：https://api.openai.com/v1 · gpt-4o-mini
+            </p>
+          </section>
+
+          <section className="card card-pad">
+            <h2 className="card-title" style={{ marginBottom: 10 }}>
+              <HardDriveDownload /> 数据备份
+            </h2>
+            <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.9, marginTop: 0, marginBottom: 12 }}>
+              下载一份 SQLite 一致性快照（含全部员工、招聘、培训与知识库）。建议在批量导入或大改动前先备份。
+            </p>
+            <a className="btn" href="/api/backup">
+              <HardDriveDownload size={15} /> 下载数据库快照
+            </a>
+            <p className="muted" style={{ fontSize: 10.5, lineHeight: 1.8, marginTop: 10, marginBottom: 0 }}>
+              恢复方式：停止服务，用备份文件替换 <code>data/hr.db</code>，再启动即可。
             </p>
           </section>
 

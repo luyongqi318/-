@@ -46,19 +46,23 @@ export function findKnowledge(question: string): { title: string; content: strin
       if (s.length === 2) shingles.add(s);
     }
     let best: { title: string; content: string } | null = null;
-    let bestScore = 0;
+    let bestTitleHits = 0;
+    let bestContentHits = 0;
     for (const item of items) {
-      let score = 0;
+      let titleHits = 0;
+      let contentHits = 0;
       for (const s of shingles) {
-        if (item.title.includes(s)) score += 3;
-        else if (item.content.includes(s)) score += 1;
+        if (item.title.includes(s)) titleHits += 1;
+        if (item.content.includes(s)) contentHits += 1;
       }
-      if (score > bestScore) {
-        bestScore = score;
+      const strong = titleHits >= 2 || (titleHits >= 1 && contentHits >= 2) || contentHits >= 4;
+      if (strong && titleHits * 2 + contentHits > bestTitleHits * 2 + bestContentHits) {
         best = item;
+        bestTitleHits = titleHits;
+        bestContentHits = contentHits;
       }
     }
-    return bestScore >= 6 ? best : null;
+    return best;
   } catch {
     return null;
   }
