@@ -2,6 +2,7 @@
 
 import { FileCode2, FileSpreadsheet, FileText, Loader2, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { ChartBlock } from "./ChartBlock";
 
 type Msg = {
   role: "user" | "assistant";
@@ -16,28 +17,52 @@ function renderInline(text: string, key: number) {
   );
 }
 
-function MessageBody({ content }: { content: string }) {
+function renderLines(content: string) {
   const lines = content.split("\n");
+  return lines.map((line, i) => {
+    const trimmed = line.trim();
+    if (!trimmed) return <div key={i} className="md-gap" />;
+    if (/^#{1,4}\s/.test(trimmed)) {
+      return (
+        <div key={i} className="md-h">
+          {renderInline(trimmed.replace(/^#{1,4}\s/, ""), i)}
+        </div>
+      );
+    }
+    if (/^[-*]\s/.test(trimmed)) {
+      return (
+        <div key={i} className="md-li">
+          {renderInline(trimmed.replace(/^[-*]\s/, ""), i)}
+        </div>
+      );
+    }
+    return <div key={i}>{renderInline(line, i)}</div>;
+  });
+}
+
+function MessageBody({ content }: { content: string }) {
+  // 支持 ```chart {...}``` 代码块，直接渲染成可下载的图表
+  const parts = content.split(/```chart\s*([\s\S]*?)```/g);
   return (
     <div className="md">
-      {lines.map((line, i) => {
-        const trimmed = line.trim();
-        if (!trimmed) return <div key={i} className="md-gap" />;
-        if (/^#{1,4}\s/.test(trimmed)) {
-          return (
-            <div key={i} className="md-h">
-              {renderInline(trimmed.replace(/^#{1,4}\s/, ""), i)}
-            </div>
-          );
+      {parts.map((part, index) => {
+        if (index % 2 === 1) {
+          try {
+            const spec = JSON.parse(part.trim());
+            return <ChartBlock key={index} spec={spec} />;
+          } catch {
+            return (
+              <pre key={index} className="md-code">
+                {part.trim()}
+              </pre>
+            );
+          }
         }
-        if (/^[-*]\s/.test(trimmed)) {
-          return (
-            <div key={i} className="md-li">
-              {renderInline(trimmed.replace(/^[-*]\s/, ""), i)}
-            </div>
-          );
-        }
-        return <div key={i}>{renderInline(line, i)}</div>;
+        return (
+          <div key={index} className="md-part">
+            {renderLines(part)}
+          </div>
+        );
       })}
     </div>
   );

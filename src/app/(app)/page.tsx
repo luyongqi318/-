@@ -1,10 +1,12 @@
 import {
   AlertTriangle,
   Briefcase,
+  Cake,
   CalendarDays,
   Clock3,
   FileWarning,
   GraduationCap,
+  PartyPopper,
   Target,
   TrendingUp,
   UserPlus,
@@ -12,13 +14,14 @@ import {
 } from "lucide-react";
 import { BarList, Donut, Funnel, MiniBars, StatCard } from "@/components/charts";
 import { Badge, PageHeader } from "@/components/ui";
-import { getDashboard } from "@/lib/queries";
+import { getCelebrations, getDashboard } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export default function DashboardPage() {
   const d = getDashboard();
   const k = d.kpi;
+  const celebrations = getCelebrations();
 
   const todos: { icon: React.ReactNode; title: string; meta: string; tone: string }[] = [
     ...d.todos.expiringContracts.map((c: any) => ({
@@ -255,6 +258,63 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
+
+      <section className="card section-gap">
+        <div className="card-head">
+          <h2 className="card-title">
+            <Cake /> 本月员工关怀
+          </h2>
+          <span className="card-sub">
+            {celebrations.month} 月 · 生日 {celebrations.birthdays.length} 人 · 入职周年 {celebrations.anniversaries.length} 人
+          </span>
+        </div>
+        <div className="grid cols-2" style={{ paddingTop: 6 }}>
+          <div>
+            <div className="stat-label" style={{ padding: "10px 22px 2px" }}>
+              生日
+            </div>
+            <div className="todo-list">
+              {celebrations.birthdays.slice(0, 5).map((item) => (
+                <div className="todo-item" key={`b-${item.name}`}>
+                  <span className="todo-icon" style={{ background: "#f7e8d6", color: "#a8763e" }}>
+                    <Cake size={14} />
+                  </span>
+                  <div className="todo-main">
+                    <b>{item.name}</b>
+                    <span>
+                      {item.department} · {item.birth_date.slice(5)}
+                    </span>
+                  </div>
+                  <Badge tone="gold">生日</Badge>
+                </div>
+              ))}
+              {celebrations.birthdays.length === 0 ? <div className="empty">本月没有员工生日</div> : null}
+            </div>
+          </div>
+          <div>
+            <div className="stat-label" style={{ padding: "10px 22px 2px" }}>
+              入职周年
+            </div>
+            <div className="todo-list">
+              {celebrations.anniversaries.slice(0, 5).map((item) => (
+                <div className="todo-item" key={`a-${item.name}`}>
+                  <span className="todo-icon" style={{ background: "#e9efe9", color: "#4f7f74" }}>
+                    <PartyPopper size={14} />
+                  </span>
+                  <div className="todo-main">
+                    <b>{item.name}</b>
+                    <span>
+                      {item.department} · 入职 {item.hire_date.slice(0, 7)}
+                    </span>
+                  </div>
+                  <Badge tone="green">{item.years} 年</Badge>
+                </div>
+              ))}
+              {celebrations.anniversaries.length === 0 ? <div className="empty">本月没有入职周年</div> : null}
+            </div>
+          </div>
+        </div>
+      </section>
     </>
   );
 }

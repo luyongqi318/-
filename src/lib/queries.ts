@@ -353,6 +353,28 @@ export function getHireTrend(months = 6) {
   return buckets;
 }
 
+export function getCelebrations() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const birthdays = all(
+    `SELECT e.name, e.birth_date, d.name AS department
+     FROM employees e JOIN departments d ON d.id = e.department_id
+     WHERE e.status != '离职' AND substr(e.birth_date, 6, 2) = ?
+     ORDER BY substr(e.birth_date, 9, 2)`,
+    month,
+  ) as { name: string; birth_date: string; department: string }[];
+  const anniversaries = all(
+    `SELECT e.name, e.hire_date, d.name AS department,
+       CAST(strftime('%Y', 'now') AS INTEGER) - CAST(strftime('%Y', e.hire_date) AS INTEGER) AS years
+     FROM employees e JOIN departments d ON d.id = e.department_id
+     WHERE e.status != '离职' AND substr(e.hire_date, 6, 2) = ?
+       AND CAST(strftime('%Y', 'now') AS INTEGER) - CAST(strftime('%Y', e.hire_date) AS INTEGER) >= 1
+     ORDER BY years DESC, substr(e.hire_date, 9, 2)`,
+    month,
+  ) as { name: string; hire_date: string; department: string; years: number }[];
+  return { month: Number(month), birthdays, anniversaries };
+}
+
 export function getDashboard() {
   const headcount = one<{ n: number }>("SELECT COUNT(*) n FROM employees WHERE status != '离职'")!.n;
   const probation = one<{ n: number }>("SELECT COUNT(*) n FROM employees WHERE status = '试用期'")!.n;

@@ -33,6 +33,15 @@ const SYSTEM_PROMPT = `你是「上海东锦江希尔顿逸林酒店」的人力
 - 合同：到期前 30 天由 HR 发起续签沟通。
 - 离职：提前 30 天书面申请，完成交接清单与资产归还。
 
+【图表】
+用户要「图 / 饼图 / 柱状图 / 占比 / 可视化」，或数据本身适合对比时，**必须直接出图**，不要说做不到。在回答里输出一个 chart 代码块（前端会渲染并可下载 PNG）：
+
+\`\`\`chart
+{"type":"pie","title":"部门人数占比","unit":"人","data":[{"label":"客房部","value":34},{"label":"餐饮部","value":25}]}
+\`\`\`
+
+type 只支持 bar / pie；data 最多 10 项；数字必须来自工具查询结果，不要编造。
+
 【可用工具】组织概览、在招职位、招聘漏斗、培训进度、考勤排班、绩效、员工检索。`;
 
 /** 系统提示 = 基础规则 + 用户投喂的制度资料（优先生效）。 */
@@ -449,6 +458,25 @@ function demoAnswer(history: { role: "user" | "assistant"; content: string }[]) 
       model: "本地演示模式",
       tools: used,
       reply: `【${job.department} · ${job.title}】招聘 JD（演示模式草稿，可直接改用）\n\n岗位职责：\n1. 按希尔顿品牌服务标准完成当班岗位的日常服务与交接；\n2. 主动识别宾客需求，处理常见问询并将复杂问题升级至主管；\n3. 维护岗位区域整洁、物资齐备，执行安全与卫生规范；\n4. 参加班前会、服务复盘与月度培训，完成考核。\n\n任职要求：\n1. 高中及以上学历，有酒店或高端服务业经验优先；\n2. 普通话流利，具备基础英语沟通能力；\n3. 能适应早/中/晚三班轮班，形象端正、服务意识强；\n4. 持健康证（餐饮、厨房岗位另需食品安全培训合格）。\n\n薪资：${job.salary_min}–${job.salary_max} 元/月，另有班次补贴与全勤奖。\n\n配置 DEEPSEEK_API_KEY 后，我可以按你的具体要求重写这份 JD。`,
+    };
+  }
+
+  if (wants(["部门", "占比", "饼图", "柱状图", "人数分布", "可视化"])) {
+    const d = getDashboard();
+    const data = d.departments.map((dep: any) => ({ label: dep.name, value: dep.n }));
+    const total = data.reduce((sum: number, item: any) => sum + item.value, 0);
+    used.push({ tool: "get_department_headcount", ok: true });
+    const spec = JSON.stringify({ type: "pie", title: "部门人数占比", unit: "人", data });
+    return {
+      demo: true,
+      model: "本地演示模式",
+      tools: used,
+      reply:
+        "各部门人数与占比如下（图可直接下载 PNG）：\n\n```chart\n" +
+        spec +
+        "\n```\n\n合计 " +
+        total +
+        " 人。如需「一线运营 vs 后台职能」两分组，或改成柱状图，跟我说一声。",
     };
   }
 

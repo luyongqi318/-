@@ -2717,3 +2717,111 @@ body {
     animation: none !important;
   }
 }
+
+/* =========================================================================
+   立体感：暖光下的层次，而不是冷科技
+   ========================================================================= */
+.card {
+  background: linear-gradient(180deg, #fffefb 0%, #fdf9f2 100%);
+  border: 1px solid rgba(176, 152, 114, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 1px 2px rgba(27, 36, 44, 0.05),
+    0 12px 26px -18px rgba(27, 36, 44, 0.4),
+    0 28px 56px -40px rgba(27, 36, 44, 0.45);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+.stat {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -18px 30px -24px rgba(176, 152, 114, 0.35),
+    0 10px 22px -16px rgba(27, 36, 44, 0.4);
+}
+
+.stat:hover {
+  transform: translateY(-3px);
+  border-color: rgba(176, 152, 114, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -18px 30px -20px rgba(176, 152, 114, 0.45),
+    0 22px 44px -22px rgba(27, 36, 44, 0.45);
+}
+
+.sidebar {
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.06), 10px 0 34px -24px rgba(0, 0, 0, 0.7);
+}
+
+.topbar {
+  box-shadow: 0 1px 0 rgba(27, 36, 44, 0.05), 0 10px 26px -24px rgba(27, 36, 44, 0.5);
+}
+
+.btn {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(27, 36, 44, 0.06);
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, #1d3d58 0%, #0f2130 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 8px 18px -12px rgba(15, 33, 48, 0.8);
+}
+
+.modal {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 30px 60px -30px rgba(15, 33, 48, 0.55),
+    0 60px 120px -60px rgba(15, 33, 48, 0.5);
+}
+
+.agent-panel {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 30px 60px -28px rgba(15, 33, 48, 0.5),
+    0 70px 120px -60px rgba(15, 33, 48, 0.45);
+}
+
+.dropzone {
+  box-shadow: inset 0 1px 0 #fff, inset 0 -20px 40px -30px rgba(176, 152, 114, 0.5);
+}
+
+/* 图表块 */
+.chart-block {
+  margin: 12px 0 6px;
+  padding: 12px 14px 10px;
+  border: 1px solid rgba(176, 152, 114, 0.28);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fffdf9 0%, #fbf5ea 100%);
+  box-shadow: inset 0 1px 0 #fff, 0 10px 22px -18px rgba(27, 36, 44, 0.45);
+}
+
+.chart-block figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+
+.chart-block-body svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.md-code {
+  background: #f5efe3;
+  border: 1px solid rgba(176, 152, 114, 0.25);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  overflow-x: auto;
+  color: #6b5a3f;
+}
+
+.md-part {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
