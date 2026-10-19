@@ -83,6 +83,13 @@ AUTH_SECRET=请替换为足够长的随机串
 
 ### Railway（推荐）
 
+仓库已初始化 git 并附带 `.github/workflows/ci.yml`，可直接推送到 GitHub：
+
+```bash
+git remote add origin <你的仓库地址>
+git push -u origin main
+```
+
 ```bash
 npm i -g @railway/cli
 railway login
