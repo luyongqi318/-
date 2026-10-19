@@ -1,0 +1,9 @@
+node_modules
+.next
+data
+shots
+tools
+*.log
+.git
+.env*.local
+README.md

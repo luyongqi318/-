@@ -1,0 +1,156 @@
+"use client";
+
+import { Send, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
+type Msg = {
+  role: "user" | "assistant";
+  content: string;
+  tools?: { tool: string; ok: boolean }[];
+};
+
+const DEFAULT_SUGGESTIONS = [
+  "本周招聘进展如何？哪些岗位缺口最大？",
+  "哪些员工培训逾期了？",
+  "帮我写一份前台接待的招聘 JD",
+  "本月排班和考勤有什么风险？",
+];
+
+export function AgentChat({
+  variant = "dock",
+  suggestions = DEFAULT_SUGGESTIONS,
+  configured = false,
+}: {
+  variant?: "dock" | "page";
+  suggestions?: string[];
+  configured?: boolean;
+}) {
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [demo, setDemo] = useState(!configured);
+  const [model, setModel] = useState(configured ? "DeepSeek" : "本地演示模式");
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, loading]);
+
+  async function send(text?: string) {
+    const question = (text ?? input).trim();
+    if (!question || loading) return;
+    setInput("");
+    setError("");
+    const next: Msg[] = [...messages, { role: "user", content: question }];
+    setMessages(next);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/agent/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: next.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+      const data = (await res.json()) as {
+        reply?: string;
+        tools?: { tool: string; ok: boolean }[];
+        demo?: boolean;
+        model?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.reply) {
+        throw new Error(data.error || "智能体暂时不可用");
+      }
+      setDemo(!!data.demo);
+      if (data.model) setModel(data.model);
+      setMessages([...next, { role: "assistant", content: data.reply, tools: data.tools }]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "请求失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <div className={variant === "page" ? "agent-page-body" : "agent-body"} ref={bodyRef}>
+        {messages.length === 0 ? (
+          <div className="agent-empty">
+            <div style={{ display: "inline-flex", padding: 14, borderRadius: 16, background: "#f7ead0", color: "#8a6415" }}>
+              <Sparkles size={24} />
+            </div>
+            <h3>今天想先处理哪件事？</h3>
+            <p style={{ fontSize: 13 }}>
+              我可以直接读取招聘、培训、员工、排班与绩效数据，回答问题、写 JD、生成面试提纲或培训计划。
+            </p>
+            <div className="suggestions" style={{ justifyContent: "center", marginTop: 14 }}>
+              {suggestions.map((s) => (
+                <button key={s} className="suggestion" onClick={() => send(s)}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {messages.map((m, i) => (
+          <div className={`msg ${m.role === "user" ? "user" : "bot"}`} key={i}>
+            <div className="msg-avatar">{m.role === "user" ? "我" : "AI"}</div>
+            <div>
+              <div className="msg-bubble">{m.content}</div>
+              {m.tools && m.tools.length > 0 ? (
+                <div className="msg-tools">
+                  {m.tools.map((t, j) => (
+                    <span className="tool-pill" key={j}>
+                      {t.tool} {t.ok ? "✓" : "×"}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ))}
+
+        {loading ? (
+          <div className="msg bot">
+            <div className="msg-avatar">AI</div>
+            <div className="msg-bubble">
+              <span className="typing">
+                <i />
+                <i />
+                <i />
+              </span>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="agent-foot">
+        {error ? <div className="form-error">{error}</div> : null}
+        <div className="agent-input-row">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            placeholder="问问招聘、培训、排班或绩效…（Enter 发送，Shift+Enter 换行）"
+            rows={1}
+          />
+          <button className="send-btn" onClick={() => void send()} disabled={loading || !input.trim()} aria-label="发送">
+            <Send size={17} />
+          </button>
+        </div>
+        <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 6, display: "flex", justifyContent: "space-between" }}>
+          <span>{demo ? "演示模式：未配置模型 Key，回答由本地数据生成" : `模型：${model}`}</span>
+          <span>数据仅来自本系统</span>
+        </div>
+      </div>
+    </>
+  );
+}
