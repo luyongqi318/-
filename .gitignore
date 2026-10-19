@@ -11,3 +11,4 @@ tools/
 next-env.d.ts
 .tmp-standalone/
 tmp/
+release/
