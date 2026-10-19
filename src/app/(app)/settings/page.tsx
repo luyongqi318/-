@@ -1,12 +1,15 @@
 import { Database, HardDriveDownload, KeyRound, ShieldCheck } from "lucide-react";
 import { AgentSettingsForm } from "@/components/AgentSettingsForm";
+import { PasswordForm } from "@/components/PasswordForm";
 import { PageHeader } from "@/components/ui";
+import { hasCustomPassword } from "@/lib/auth";
 import { getAgentConfig } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 export default function SettingsPage() {
   const config = getAgentConfig();
+  const customPassword = hasCustomPassword();
 
   return (
     <>
@@ -27,6 +30,8 @@ export default function SettingsPage() {
               source: config.source,
             }}
           />
+
+          <PasswordForm custom={customPassword} />
 
           <section className="card card-pad">
             <h2 className="card-title" style={{ marginBottom: 12 }}>

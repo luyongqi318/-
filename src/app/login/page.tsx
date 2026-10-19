@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import { BarChart3, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { LoginForm } from "@/components/LoginForm";
-import { getSession } from "@/lib/auth";
+import { getSession, hasCustomPassword } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   const session = await getSession();
   if (session) redirect("/");
+  const customPassword = hasCustomPassword();
 
   return (
     <div className="login-page">
@@ -56,11 +57,19 @@ export default async function LoginPage() {
             <h2>登录工作台</h2>
             <p className="hint">使用酒店 HR 账号登录，演示环境可直接使用下方账号。</p>
             <LoginForm />
-            <div className="demo-hint">
-              演示账号：<b>hr</b> / 密码：<b>doubletree2026</b>
-              <br />
-              生产环境请通过 HR_USER、HR_PASS 环境变量覆盖。
-            </div>
+            {customPassword ? (
+              <div className="demo-hint">
+                该环境已自定义登录密码，请使用管理员分配的密码登录。
+                <br />
+                如需重置，删除数据库中的 <b>admin_password_hash</b> 配置后重启。
+              </div>
+            ) : (
+              <div className="demo-hint">
+                演示账号：<b>hr</b> / 密码：<b>doubletree2026</b>
+                <br />
+                生产环境请通过 HR_USER、HR_PASS 环境变量覆盖，或登录后在「系统设置」修改密码。
+              </div>
+            )}
           </div>
           <div className="login-note">Internal system · 仅限授权员工使用</div>
         </div>
