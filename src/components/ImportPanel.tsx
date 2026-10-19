@@ -3,6 +3,7 @@
 import { CheckCircle2, Download, FileSpreadsheet, Loader2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AutoImportCard } from "./AutoImportCard";
 
 type Entity = { key: string; label: string; desc: string; headers: string[] };
 type Result = {
@@ -40,8 +41,12 @@ export function ImportPanel({ entities }: { entities: Entity[] }) {
   }
 
   return (
-    <div className="grid cols-2">
-      {entities.map((entity) => {
+    <>
+      <AutoImportCard />
+      <details className="import-types" open>
+        <summary>按类型导入（可下载模板）</summary>
+        <div className="grid cols-2" style={{ marginTop: 16 }}>
+          {entities.map((entity) => {
         const result = results[entity.key];
         const error = errors[entity.key];
         return (
@@ -119,6 +124,8 @@ export function ImportPanel({ entities }: { entities: Entity[] }) {
           </section>
         );
       })}
-    </div>
+        </div>
+      </details>
+    </>
   );
 }

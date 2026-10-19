@@ -468,3 +468,170 @@ export function templateCsv(entityKey: string): string {
   const lines = [entity.headers.join(","), ...entity.sample.map((row) => row.map((cell) => `"${cell}"`).join(","))];
   return `\uFEFF${lines.join("\r\n")}\r\n`;
 }
+
+/* ------------------------------------------------------------------ */
+/* 自动识别：任意表格进来，猜它属于哪类数据并自动对齐表头                  */
+/* ------------------------------------------------------------------ */
+
+type EntityKey = "employees" | "jobs" | "candidates" | "courses" | "enrollments";
+
+const ENTITY_META: Record<
+  EntityKey,
+  { required: string[]; requiredAny?: string[][]; aliases: Record<string, string[]> }
+> = {
+  employees: {
+    required: ["姓名", "部门"],
+    aliases: {
+      工号: ["员工编号", "员工号", "编号"],
+      姓名: ["名字", "员工姓名"],
+      性别: ["性别"],
+      手机号: ["电话", "联系电话", "手机"],
+      邮箱: ["电子邮箱", "email", "Email"],
+      部门: ["所属部门", "部门名称"],
+      职位: ["岗位", "岗位名称", "职务"],
+      级别: ["职级"],
+      入职日期: ["入职时间", "入职日", "到岗日期"],
+      状态: ["在职状态"],
+      合同到期: ["合同到期日", "合同截止日期"],
+      月薪: ["薪资", "工资", "月工资"],
+    },
+  },
+  jobs: {
+    required: ["职位", "部门"],
+    aliases: {
+      职位: ["岗位", "职位名称", "岗位名称"],
+      部门: ["所属部门", "部门名称"],
+      招聘人数: ["需求人数", "人数"],
+      已招: ["已招人数"],
+      薪资下限: ["最低薪资", "起薪"],
+      薪资上限: ["最高薪资", "顶薪"],
+      优先级: ["紧急度"],
+      状态: ["招聘状态"],
+      负责人: ["招聘负责人"],
+      发布日期: ["发布时间", "创建日期"],
+      职位描述: ["岗位职责", "描述"],
+    },
+  },
+  candidates: {
+    required: ["姓名", "应聘职位"],
+    aliases: {
+      姓名: ["候选人", "候选人姓名", "名字"],
+      应聘职位: ["应聘岗位", "申请职位", "应聘岗位名称"],
+      手机号: ["电话", "联系电话", "手机"],
+      来源: ["渠道", "招聘渠道"],
+      阶段: ["进度", "当前阶段"],
+      评分: ["星级", "评价"],
+      投递日期: ["投递时间", "申请日期"],
+      备注: ["说明"],
+    },
+  },
+  courses: {
+    required: ["课程名称"],
+    aliases: {
+      课程名称: ["课程", "课程名", "培训课程"],
+      分类: ["类别", "课程分类"],
+      "时长(分钟)": ["时长", "分钟", "课程时长"],
+      是否必修: ["必修", "是否必须"],
+      简介: ["描述", "说明", "课程简介"],
+    },
+  },
+  enrollments: {
+    required: ["课程名称"],
+    requiredAny: [["员工工号", "员工姓名"]],
+    aliases: {
+      员工工号: ["工号", "员工编号"],
+      员工姓名: ["姓名", "员工"],
+      课程名称: ["课程", "课程名"],
+      状态: ["学习状态"],
+      进度: ["完成度", "完成进度"],
+      分配日期: ["指派日期", "分配时间"],
+      截止日期: ["到期日", "截止时间"],
+      成绩: ["分数", "得分"],
+    },
+  },
+};
+
+export const ALL_HEADERS: string[] = Array.from(
+  new Set(
+    ENTITIES.flatMap((entity) => [
+      ...entity.headers,
+      ...Object.values(ENTITY_META[entity.key as EntityKey].aliases).flat(),
+    ]),
+  ),
+);
+
+function findSource(candidates: string[], normHeaders: string[], headers: string[]): string | undefined {
+  for (const candidate of candidates) {
+    const idx = normHeaders.indexOf(normalizeHeader(candidate));
+    if (idx >= 0) return headers[idx];
+  }
+  for (const candidate of candidates) {
+    const key = normalizeHeader(candidate);
+    if (key.length < 2) continue;
+    const idx = normHeaders.findIndex((h) => h.length >= 2 && (h.includes(key) || key.includes(h)));
+    if (idx >= 0) return headers[idx];
+  }
+  return undefined;
+}
+
+export type Detection = {
+  entity: EntityKey;
+  label: string;
+  matched: number;
+  total: number;
+  mapping: Record<string, string>;
+};
+
+export function detectEntity(headers: string[]): Detection | null {
+  const normHeaders = headers.map(normalizeHeader);
+  let best: Detection | null = null;
+
+  for (const entity of ENTITIES) {
+    const meta = ENTITY_META[entity.key as EntityKey];
+    const mapping: Record<string, string> = {};
+    for (const canonical of entity.headers) {
+      const source = findSource([canonical, ...(meta.aliases[canonical] ?? [])], normHeaders, headers);
+      if (source) mapping[canonical] = source;
+    }
+    const matched = Object.keys(mapping).length;
+    const requiredOk =
+      meta.required.every((field) => Boolean(mapping[field])) &&
+      (meta.requiredAny ?? []).every((group) => group.some((field) => Boolean(mapping[field])));
+    if (!requiredOk) continue;
+    if (!best || matched > best.matched) {
+      best = {
+        entity: entity.key as EntityKey,
+        label: entity.label,
+        matched,
+        total: entity.headers.length,
+        mapping,
+      };
+    }
+  }
+  return best;
+}
+
+export function importAuto(headers: string[], rows: Record<string, string>[]) {
+  const detection = detectEntity(headers);
+  if (!detection) return null;
+
+  const remapped = rows.map((row) => {
+    const out: Record<string, string> = {};
+    for (const [canonical, source] of Object.entries(detection.mapping)) {
+      out[canonical] = row[source] ?? "";
+    }
+    return out;
+  });
+
+  const result = importRows(detection.entity, remapped);
+  return {
+    result,
+    detected: {
+      entity: detection.entity,
+      label: detection.label,
+      matched: detection.matched,
+      total: detection.total,
+      columns: Object.entries(detection.mapping).map(([target, source]) => ({ target, source })),
+    },
+  };
+}

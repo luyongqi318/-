@@ -1,6 +1,6 @@
 "use client";
 
-import { Send, Sparkles } from "lucide-react";
+import { FileCode2, FileSpreadsheet, FileText, Loader2, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type Msg = {
@@ -8,6 +8,40 @@ type Msg = {
   content: string;
   tools?: { tool: string; ok: boolean }[];
 };
+
+/** 轻量 Markdown：只处理标题、列表与 **加粗**，避免引入额外依赖。 */
+function renderInline(text: string, key: number) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") ? <strong key={`${key}-${i}`}>{part.slice(2, -2)}</strong> : <span key={`${key}-${i}`}>{part}</span>,
+  );
+}
+
+function MessageBody({ content }: { content: string }) {
+  const lines = content.split("\n");
+  return (
+    <div className="md">
+      {lines.map((line, i) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={i} className="md-gap" />;
+        if (/^#{1,4}\s/.test(trimmed)) {
+          return (
+            <div key={i} className="md-h">
+              {renderInline(trimmed.replace(/^#{1,4}\s/, ""), i)}
+            </div>
+          );
+        }
+        if (/^[-*]\s/.test(trimmed)) {
+          return (
+            <div key={i} className="md-li">
+              {renderInline(trimmed.replace(/^[-*]\s/, ""), i)}
+            </div>
+          );
+        }
+        return <div key={i}>{renderInline(line, i)}</div>;
+      })}
+    </div>
+  );
+}
 
 const DEFAULT_SUGGESTIONS = [
   "本周招聘进展如何？哪些岗位缺口最大？",
@@ -31,6 +65,7 @@ export function AgentChat({
   const [error, setError] = useState("");
   const [demo, setDemo] = useState(!configured);
   const [model, setModel] = useState(configured ? "DeepSeek" : "本地演示模式");
+  const [exporting, setExporting] = useState("");
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -73,6 +108,28 @@ export function AgentChat({
     }
   }
 
+  async function exportAs(message: Msg, index: number, format: string) {
+    if (exporting) return;
+    setExporting(`${index}-${format}`);
+    setError("");
+    try {
+      const firstLine = message.content.split("\n").find((line) => line.trim()) ?? "智能体导出";
+      const title = firstLine.replace(/^#+\s*/, "").replace(/\*\*/g, "").replace(/[【】]/g, "").trim().slice(0, 28) || "智能体导出";
+      const res = await fetch("/api/artifacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format, title, content: message.content }),
+      });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) throw new Error(data.error || "生成文件失败");
+      window.location.href = data.url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "生成文件失败");
+    } finally {
+      setExporting("");
+    }
+  }
+
   return (
     <>
       <div className={variant === "page" ? "agent-page-body" : "agent-body"} ref={bodyRef}>
@@ -99,7 +156,9 @@ export function AgentChat({
           <div className={`msg ${m.role === "user" ? "user" : "bot"}`} key={i}>
             <div className="msg-avatar">{m.role === "user" ? "我" : "AI"}</div>
             <div>
-              <div className="msg-bubble">{m.content}</div>
+              <div className="msg-bubble">
+                <MessageBody content={m.content} />
+              </div>
               {m.tools && m.tools.length > 0 ? (
                 <div className="msg-tools">
                   {m.tools.map((t, j) => (
@@ -107,6 +166,22 @@ export function AgentChat({
                       {t.tool} {t.ok ? "✓" : "×"}
                     </span>
                   ))}
+                </div>
+              ) : null}
+              {m.role === "assistant" ? (
+                <div className="msg-actions">
+                  <button className="msg-action" disabled={!!exporting} onClick={() => void exportAs(m, i, "docx")}>
+                    {exporting === `${i}-docx` ? <Loader2 size={12} className="spin" /> : <FileText size={12} />} Word
+                  </button>
+                  <button className="msg-action" disabled={!!exporting} onClick={() => void exportAs(m, i, "xlsx")}>
+                    {exporting === `${i}-xlsx` ? <Loader2 size={12} className="spin" /> : <FileSpreadsheet size={12} />} Excel
+                  </button>
+                  <button className="msg-action" disabled={!!exporting} onClick={() => void exportAs(m, i, "md")}>
+                    {exporting === `${i}-md` ? <Loader2 size={12} className="spin" /> : <FileCode2 size={12} />} Markdown
+                  </button>
+                  <button className="msg-action" disabled={!!exporting} onClick={() => void exportAs(m, i, "txt")}>
+                    {exporting === `${i}-txt` ? <Loader2 size={12} className="spin" /> : <FileText size={12} />} 文本
+                  </button>
                 </div>
               ) : null}
             </div>

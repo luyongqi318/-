@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
+import { clientIp } from "@/lib/rate-limit";
 import { getDb } from "@/lib/db";
 import { todayIso } from "@/lib/queries";
 
@@ -42,5 +44,6 @@ export async function POST(req: Request) {
     )
     .run(title, departmentId, headcount, salaryMin, salaryMax, priority, session.u, todayIso(), description);
 
+  logAudit("发布职位", `${title} · ${headcount} 人`, session.u, clientIp(req));
   return NextResponse.json({ ok: true, id: Number(result.lastInsertRowid) });
 }

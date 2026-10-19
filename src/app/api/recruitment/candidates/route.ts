@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
+import { clientIp } from "@/lib/rate-limit";
 import { getDb } from "@/lib/db";
 import { todayIso } from "@/lib/queries";
 
@@ -22,7 +24,7 @@ export async function PATCH(req: Request) {
   if (!STAGES.includes(stage)) return NextResponse.json({ error: "阶段不合法" }, { status: 400 });
 
   const db = getDb();
-  const candidate = db.prepare("SELECT id, stage FROM candidates WHERE id = ?").get(id) as any;
+  const candidate = db.prepare("SELECT id, name, stage FROM candidates WHERE id = ?").get(id) as any;
   if (!candidate) return NextResponse.json({ error: "候选人不存在" }, { status: 404 });
 
   if (stage === "已入职") {
@@ -31,5 +33,6 @@ export async function PATCH(req: Request) {
     db.prepare("UPDATE candidates SET stage = ? WHERE id = ?").run(stage, id);
   }
 
+  logAudit("更新候选人阶段", `${candidate.name}：${candidate.stage} → ${stage}`, session.u, clientIp(req));
   return NextResponse.json({ ok: true, id, stage });
 }

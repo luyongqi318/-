@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logAudit } from "@/lib/audit";
 import { checkCredentials, getSession, setAdminPassword } from "@/lib/auth";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 
@@ -33,5 +34,6 @@ export async function POST(req: Request) {
   }
 
   setAdminPassword(next);
+  logAudit("修改登录密码", "密码已更新", session.u, clientIp(req));
   return NextResponse.json({ ok: true });
 }

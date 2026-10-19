@@ -2326,3 +2326,394 @@ table.data tbody tr:hover .cell-main {
     grid-template-columns: 120px repeat(7, minmax(74px, 1fr));
   }
 }
+
+/* =========================================================================
+   温度调整：更像酒店，而不是控制台
+   ========================================================================= */
+:root {
+  --bg: #faf7f1;
+  --panel: #fffdfa;
+  --line: #ece3d4;
+  --line-2: #dbcdb8;
+  --ink: #1b242c;
+  --gold: #ab8a52;
+  --gold-2: #c9a869;
+}
+
+body {
+  background:
+    radial-gradient(1100px 420px at 78% -12%, #fdf1dc 0%, rgba(253, 241, 220, 0) 62%),
+    radial-gradient(900px 380px at 6% 0%, #f6efe3 0%, rgba(246, 239, 227, 0) 58%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+.card {
+  background: var(--panel);
+  box-shadow: 0 1px 2px rgba(27, 36, 44, 0.04), 0 16px 40px -30px rgba(27, 36, 44, 0.35);
+}
+
+.page-title {
+  font-family: var(--serif);
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  font-size: 30px;
+}
+
+.page-desc {
+  font-size: 12.5px;
+  letter-spacing: 0.3px;
+}
+
+.topbar {
+  background: rgba(255, 253, 250, 0.86);
+}
+
+.agent-body,
+.agent-page-body {
+  background: linear-gradient(180deg, #fdfaf4, #faf5ec);
+}
+
+.msg.bot .msg-bubble {
+  background: #fffdf9;
+  border-color: #efe6d8;
+}
+
+/* 智能体回复下方的文件导出按钮 */
+.msg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* 智能体回复里的轻量 Markdown */
+.md {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.md-gap {
+  height: 7px;
+}
+
+.md-h {
+  font-weight: 600;
+  margin-top: 5px;
+  color: var(--ink);
+}
+
+.md-li {
+  padding-left: 12px;
+  position: relative;
+}
+
+.md-li::before {
+  content: "·";
+  position: absolute;
+  left: 2px;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.msg-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: #fffdfa;
+  color: #6b5a3f;
+  font-size: 10.5px;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: border-color 0.16s, background 0.16s, color 0.16s;
+}
+
+.msg-action:hover:not(:disabled) {
+  border-color: var(--gold-2);
+  color: var(--gold);
+  background: #fdf7ec;
+}
+
+.msg-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 智能识别上传区 */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 34px 20px;
+  border: 1.5px dashed var(--line-2);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fffdf8, #fbf5ea);
+  color: var(--gold);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.18s, background 0.18s, transform 0.18s;
+}
+
+.dropzone:hover,
+.dropzone.drag {
+  border-color: var(--gold-2);
+  background: linear-gradient(180deg, #fffaf0, #f9f0df);
+  transform: translateY(-1px);
+}
+
+.dropzone .muted {
+  color: #8b7c66;
+}
+
+/* 按类型导入折叠区 */
+.import-types {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 0 20px 18px;
+}
+
+.import-types > summary {
+  cursor: pointer;
+  padding: 16px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  letter-spacing: 0.3px;
+  list-style: none;
+}
+
+.import-types > summary::-webkit-details-marker {
+  display: none;
+}
+
+.import-types > summary::before {
+  content: "＋";
+  color: var(--gold);
+  margin-right: 8px;
+  font-weight: 600;
+}
+
+.import-types[open] > summary::before {
+  content: "－";
+}
+
+.import-types .card {
+  box-shadow: none;
+  background: #fffdf9;
+}
+
+/* =========================================================================
+   动效增强：让页面“活”一点，但仍然克制
+   ========================================================================= */
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(-2deg);
+  }
+}
+@keyframes sheenCard {
+  from {
+    transform: translateX(-130%) skewX(-18deg);
+  }
+  to {
+    transform: translateX(240%) skewX(-18deg);
+  }
+}
+@keyframes glowPulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(200, 168, 106, 0.18);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(200, 168, 106, 0.5);
+  }
+}
+@keyframes ruleDraw {
+  from {
+    transform: scaleX(0);
+    opacity: 0.2;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes heroDrift {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 65% 40%;
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+/* 网格卡片错落入场（比整块出现更有层次） */
+.route-enter .grid > * {
+  animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.route-enter .grid > *:nth-child(2) {
+  animation-delay: 0.05s;
+}
+.route-enter .grid > *:nth-child(3) {
+  animation-delay: 0.1s;
+}
+.route-enter .grid > *:nth-child(4) {
+  animation-delay: 0.15s;
+}
+.route-enter .grid > *:nth-child(5) {
+  animation-delay: 0.2s;
+}
+.route-enter .grid > *:nth-child(6) {
+  animation-delay: 0.25s;
+}
+
+/* 指标卡：图标轻浮动 + 悬停扫光 */
+.stat-icon {
+  animation: floaty 5.5s ease-in-out infinite;
+}
+.stat:nth-child(2n) .stat-icon {
+  animation-delay: 0.9s;
+}
+.stat:nth-child(3n) .stat-icon {
+  animation-delay: 1.6s;
+}
+.stat:hover .stat-icon {
+  animation-play-state: paused;
+}
+.stat::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40%;
+  width: 34%;
+  background: linear-gradient(100deg, transparent, rgba(200, 168, 106, 0.18), transparent);
+  transform: skewX(-18deg);
+  opacity: 0;
+  pointer-events: none;
+}
+.stat:hover::before {
+  opacity: 1;
+  animation: sheenCard 0.95s ease;
+}
+
+/* 表格行依次浮现 */
+.route-enter table.data tbody tr {
+  animation: rowIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.route-enter table.data tbody tr:nth-child(1) {
+  animation-delay: 0.04s;
+}
+.route-enter table.data tbody tr:nth-child(2) {
+  animation-delay: 0.08s;
+}
+.route-enter table.data tbody tr:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.route-enter table.data tbody tr:nth-child(4) {
+  animation-delay: 0.16s;
+}
+.route-enter table.data tbody tr:nth-child(5) {
+  animation-delay: 0.2s;
+}
+.route-enter table.data tbody tr:nth-child(6) {
+  animation-delay: 0.24s;
+}
+.route-enter table.data tbody tr:nth-child(7) {
+  animation-delay: 0.28s;
+}
+.route-enter table.data tbody tr:nth-child(8) {
+  animation-delay: 0.32s;
+}
+
+/* 分区标题的金线缓缓展开 */
+.section-title h2 {
+  position: relative;
+  padding-bottom: 5px;
+}
+.section-title h2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--gold-2), transparent);
+  transform-origin: left center;
+  animation: ruleDraw 0.9s 0.15s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 侧栏当前项轻轻呼吸 */
+.nav-link.active {
+  animation: glowPulse 3.8s ease-in-out infinite;
+}
+
+/* 登录页：暖光缓慢流动 */
+.login-hero {
+  background-size: 140% 140%;
+  animation: heroDrift 26s ease-in-out infinite alternate;
+}
+.login-hero .brand-mark {
+  animation: breathe 6s ease-in-out infinite;
+}
+
+/* 按钮图标跟随微移 */
+.btn:hover svg {
+  transform: translateX(1px);
+}
+.btn svg {
+  transition: transform 0.2s ease;
+}
+
+/* 智能体思考态：气泡内的小光带 */
+.typing {
+  position: relative;
+  overflow: hidden;
+}
+.typing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(200, 168, 106, 0.16) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: sheenCard 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-icon,
+  .nav-link.active,
+  .login-hero,
+  .login-hero .brand-mark {
+    animation: none !important;
+  }
+}

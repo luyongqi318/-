@@ -88,27 +88,44 @@ export default function AgentPage() {
 
           <section className="card card-pad">
             <h2 className="card-title" style={{ marginBottom: 10 }}>
-              <Database /> 接入自己的模型
+              <Database /> {hasKey ? "当前模型接入" : "接入自己的模型"}
             </h2>
-            <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.9, marginTop: 0 }}>
-              在项目根目录 <code>.env.local</code> 中配置，重启后生效：
-            </p>
-            <pre
-              style={{
-                background: "#fbf9f5",
-                border: "1px solid var(--line)",
-                borderRadius: 4,
-                padding: "10px 12px",
-                fontSize: 11,
-                lineHeight: 1.9,
-                overflowX: "auto",
-                color: "#35424f",
-              }}
-            >
-              {`DEEPSEEK_API_KEY=sk-xxxx
+            {hasKey ? (
+              <>
+                <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.9, marginTop: 0 }}>
+                  已接入 <b style={{ color: "var(--ink)" }}>{config.model}</b>
+                  <br />
+                  网关：{config.baseUrl}
+                  <br />
+                  来源：{config.source === "db" ? "系统设置（本地数据库）" : "环境变量"}
+                </p>
+                <a className="btn" href="/settings" style={{ marginTop: 6 }}>
+                  前往系统设置更换
+                </a>
+              </>
+            ) : (
+              <>
+                <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.9, marginTop: 0 }}>
+                  在项目根目录 <code>.env.local</code> 中配置，重启后生效：
+                </p>
+                <pre
+                  style={{
+                    background: "#fbf9f5",
+                    border: "1px solid var(--line)",
+                    borderRadius: 4,
+                    padding: "10px 12px",
+                    fontSize: 11,
+                    lineHeight: 1.9,
+                    overflowX: "auto",
+                    color: "#35424f",
+                  }}
+                >
+                  {`DEEPSEEK_API_KEY=sk-xxxx
 AGENT_MODEL=deepseek-chat
 AGENT_BASE_URL=https://api.deepseek.com`}
-            </pre>
+                </pre>
+              </>
+            )}
             <p className="muted" style={{ fontSize: 11, lineHeight: 1.8, marginBottom: 0 }}>
               兼容任意 OpenAI 协议的网关（通义、智谱、Kimi、自建代理）只需改 BASE_URL 与模型名。
             </p>

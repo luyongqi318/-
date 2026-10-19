@@ -1,13 +1,15 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
+import { clientIp } from "@/lib/rate-limit";
 import { getDb } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 /** 用 SQLite VACUUM INTO 生成一致性快照，避免直接拷贝 WAL 数据库拿到半截数据。 */
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return new Response("请先登录", { status: 401 });
 
@@ -20,6 +22,7 @@ export async function GET() {
   try {
     getDb().exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`);
     const data = fs.readFileSync(tmp);
+    logAudit("下载数据库备份", `${data.length} bytes`, session.u, clientIp(req));
     return new Response(new Uint8Array(data), {
       headers: {
         "Content-Type": "application/octet-stream",

@@ -3,6 +3,7 @@ import {
   CalendarClock,
   GraduationCap,
   LayoutDashboard,
+  ScrollText,
   Settings,
   Sparkles,
   Target,
@@ -35,6 +36,7 @@ export function Sidebar({ interviewBadge }: { interviewBadge?: number }) {
       <nav className="nav">
         <NavLink href="/scheduling" label="排班与考勤" icon={<CalendarClock />} />
         <NavLink href="/performance" label="绩效评估" icon={<Target />} />
+        <NavLink href="/audit" label="审计日志" icon={<ScrollText />} />
       </nav>
 
       <div className="nav-group-label">智能助手</div>

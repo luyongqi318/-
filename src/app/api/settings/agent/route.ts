@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
+import { clientIp } from "@/lib/rate-limit";
 import { getAgentConfig, setSetting } from "@/lib/settings";
 
 export async function GET() {
@@ -49,6 +51,12 @@ export async function POST(req: Request) {
   }
 
   const config = getAgentConfig();
+  logAudit(
+    "更新模型配置",
+    body.clearKey ? "已清除 API Key" : `Key ${config.masked || "(未配置)"} · ${config.model}`,
+    session.u,
+    clientIp(req),
+  );
   return NextResponse.json({
     ok: true,
     configured: Boolean(config.apiKey),

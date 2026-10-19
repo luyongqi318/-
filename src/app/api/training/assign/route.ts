@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
+import { clientIp } from "@/lib/rate-limit";
 import { getDb } from "@/lib/db";
 import { todayIso } from "@/lib/queries";
 
@@ -26,11 +28,11 @@ export async function POST(req: Request) {
   }
 
   const db = getDb();
-  const employee = db.prepare("SELECT id, status FROM employees WHERE id = ?").get(employeeId) as any;
+  const employee = db.prepare("SELECT id, name, status FROM employees WHERE id = ?").get(employeeId) as any;
   if (!employee || employee.status === "离职") {
     return NextResponse.json({ error: "员工不存在或已离职" }, { status: 400 });
   }
-  const course = db.prepare("SELECT id FROM courses WHERE id = ?").get(courseId);
+  const course = db.prepare("SELECT id, title FROM courses WHERE id = ?").get(courseId) as any;
   if (!course) return NextResponse.json({ error: "课程不存在" }, { status: 400 });
 
   const exists = db
@@ -45,5 +47,6 @@ export async function POST(req: Request) {
     )
     .run(employeeId, courseId, todayIso(), dueDate);
 
+  logAudit("分配培训", `${employee.name} ← ${course.title}`, session.u, clientIp(req));
   return NextResponse.json({ ok: true, id: Number(result.lastInsertRowid) });
 }

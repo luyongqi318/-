@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
-import { importRows, parseTable, getEntity } from "@/lib/import-schema";
+import { ALL_HEADERS, getEntity, importAuto, importRows, parseTable } from "@/lib/import-schema";
+import { clientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +18,9 @@ export async function POST(req: Request) {
   }
 
   const entityKey = String(form.get("entity") ?? "");
-  const entity = getEntity(entityKey);
-  if (!entity) return NextResponse.json({ error: "未知的导入类型" }, { status: 400 });
+  const isAuto = entityKey === "auto";
+  const entity = isAuto ? null : getEntity(entityKey);
+  if (!isAuto && !entity) return NextResponse.json({ error: "未知的导入类型" }, { status: 400 });
 
   const file = form.get("file");
   if (!(file instanceof File)) return NextResponse.json({ error: "请选择要上传的文件" }, { status: 400 });
@@ -25,10 +28,33 @@ export async function POST(req: Request) {
   if (file.size > 8 * 1024 * 1024) return NextResponse.json({ error: "文件超过 8MB，请拆分后再传" }, { status: 400 });
 
   try {
-    const { rows } = await parseTable(file, [...entity.headers]);
+    const expected = isAuto ? ALL_HEADERS : [...(entity?.headers ?? [])];
+    const { headers, rows } = await parseTable(file, expected);
     if (rows.length === 0) return NextResponse.json({ error: "没有解析到数据行，请检查表头与内容" }, { status: 400 });
     if (rows.length > 2000) return NextResponse.json({ error: "单次最多导入 2000 行，请拆分文件" }, { status: 400 });
+
+    if (isAuto) {
+      const auto = importAuto(headers, rows);
+      if (!auto) {
+        return NextResponse.json(
+          {
+            error:
+              "没能识别出数据类型。请确认表头里有「姓名 / 部门 / 职位 / 课程名称 / 应聘职位」这类字段，或在下方按类型指定导入。",
+          },
+          { status: 422 },
+        );
+      }
+      logAudit(
+        "导入数据",
+        `${auto.detected.label}（自动识别）：新增 ${auto.result.inserted}，跳过 ${auto.result.skipped}，错误 ${auto.result.errors.length}`,
+        session.u,
+        clientIp(req),
+      );
+      return NextResponse.json({ ok: true, ...auto.result, detected: auto.detected });
+    }
+
     const result = importRows(entityKey, rows);
+    logAudit("导入数据", `${result.label}：新增 ${result.inserted}，跳过 ${result.skipped}，错误 ${result.errors.length}`, session.u, clientIp(req));
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "导入失败";

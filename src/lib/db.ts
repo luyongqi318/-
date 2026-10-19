@@ -175,11 +175,41 @@ function initDb(): DB {
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec(SCHEMA);
+  migrate(db);
   const row = db.prepare("SELECT COUNT(*) AS n FROM employees").get() as { n: number } | undefined;
   if (!row || Number(row.n) === 0) {
     seedDatabase(db);
   }
   return db;
+}
+
+/**
+ * 轻量迁移：用 PRAGMA user_version 记录版本，后续加表/加字段时在这里追加步骤。
+ * 已有数据库会在启动时自动补齐，不需要手工改库。
+ */
+function migrate(db: DB): void {
+  const current = Number((db.prepare("PRAGMA user_version").get() as { user_version: number } | undefined)?.user_version ?? 0);
+  let version = current;
+
+  if (version < 1) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts TEXT NOT NULL,
+        actor TEXT NOT NULL,
+        action TEXT NOT NULL,
+        detail TEXT NOT NULL,
+        ip TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
+      CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
+    `);
+    version = 1;
+  }
+
+  if (version !== current) {
+    db.exec(`PRAGMA user_version = ${version}`);
+  }
 }
 
 export function getDb(): DB {

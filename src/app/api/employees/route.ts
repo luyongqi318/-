@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
+import { clientIp } from "@/lib/rate-limit";
 import { getDb } from "@/lib/db";
 import { normalizeDateSafe, todayIso } from "@/lib/employee-utils";
 
@@ -57,5 +59,6 @@ export async function POST(req: Request) {
       null,
     );
 
+  logAudit("录入员工", `${name} · ${position}（${empNo}）`, session.u, clientIp(req));
   return NextResponse.json({ ok: true, id: Number(res.lastInsertRowid), emp_no: empNo });
 }
