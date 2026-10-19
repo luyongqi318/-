@@ -3,6 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 export function NewJobDialog({ departments }: { departments: { id: number; name: string }[] }) {
   const router = useRouter();
@@ -69,9 +70,10 @@ export function NewJobDialog({ departments }: { departments: { id: number; name:
       <button className="btn btn-primary" onClick={() => setOpen(true)}>
         <Plus size={15} /> 发布职位
       </button>
-      {open ? (
-        <div className="modal-backdrop" onClick={() => setOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+      {open
+        ? createPortal(
+            <div className="modal-backdrop" onClick={() => setOpen(false)}>
+              <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h3>发布新职位</h3>
               <button className="icon-btn" onClick={() => setOpen(false)} aria-label="关闭">
@@ -148,9 +150,11 @@ export function NewJobDialog({ departments }: { departments: { id: number; name:
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      ) : null}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
