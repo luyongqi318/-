@@ -1,8 +1,10 @@
 import { Database, HardDriveDownload, KeyRound, ShieldCheck } from "lucide-react";
 import { AgentSettingsForm } from "@/components/AgentSettingsForm";
 import { PasswordForm } from "@/components/PasswordForm";
+import { SmtpForm } from "@/components/SmtpForm";
 import { PageHeader } from "@/components/ui";
 import { hasCustomPassword } from "@/lib/auth";
+import { getSmtpConfig } from "@/lib/mailer";
 import { getAgentConfig } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default function SettingsPage() {
   const config = getAgentConfig();
   const customPassword = hasCustomPassword();
+  const smtp = getSmtpConfig();
 
   return (
     <>
@@ -32,6 +35,17 @@ export default function SettingsPage() {
           />
 
           <PasswordForm custom={customPassword} />
+
+          <SmtpForm
+            initial={{
+              host: smtp.host,
+              port: String(smtp.port),
+              user: smtp.user,
+              from: smtp.from,
+              secure: smtp.secure,
+              configured: smtp.configured,
+            }}
+          />
 
           <section className="card card-pad">
             <h2 className="card-title" style={{ marginBottom: 12 }}>

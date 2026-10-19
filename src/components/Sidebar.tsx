@@ -1,8 +1,10 @@
 import {
   Briefcase,
   CalendarClock,
+  ClipboardCheck,
   GraduationCap,
   LayoutDashboard,
+  Mail,
   ScrollText,
   Settings,
   Sparkles,
@@ -34,6 +36,8 @@ export function Sidebar({ interviewBadge }: { interviewBadge?: number }) {
 
       <div className="nav-group-label">运营</div>
       <nav className="nav">
+        <NavLink href="/approvals" label="审批中心" icon={<ClipboardCheck />} />
+        <NavLink href="/messages" label="邮件中心" icon={<Mail />} />
         <NavLink href="/scheduling" label="排班与考勤" icon={<CalendarClock />} />
         <NavLink href="/performance" label="绩效评估" icon={<Target />} />
         <NavLink href="/audit" label="审计日志" icon={<ScrollText />} />

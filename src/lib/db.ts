@@ -207,6 +207,44 @@ function migrate(db: DB): void {
     version = 1;
   }
 
+  if (version < 2) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS approvals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        requester TEXT NOT NULL,
+        employee_id INTEGER,
+        title TEXT NOT NULL,
+        detail TEXT NOT NULL,
+        start_date TEXT,
+        end_date TEXT,
+        amount REAL,
+        status TEXT NOT NULL,
+        approver TEXT,
+        comment TEXT,
+        created_at TEXT NOT NULL,
+        decided_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status);
+
+      CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        to_addr TEXT NOT NULL,
+        to_name TEXT,
+        subject TEXT NOT NULL,
+        body TEXT NOT NULL,
+        template TEXT,
+        status TEXT NOT NULL,
+        error TEXT,
+        provider TEXT,
+        created_at TEXT NOT NULL,
+        sent_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
+    `);
+    version = 2;
+  }
+
   if (version !== current) {
     db.exec(`PRAGMA user_version = ${version}`);
   }
