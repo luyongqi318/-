@@ -2,7 +2,7 @@
 
 import { Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function AssignTrainingDialog({
   employees,
@@ -22,6 +22,15 @@ export function AssignTrainingDialog({
     d.setDate(d.getDate() + 21);
     return d.toISOString().slice(0, 10);
   });
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

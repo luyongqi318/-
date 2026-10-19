@@ -99,6 +99,15 @@ AUTH_SECRET=请替换为足够长的随机串
 
 ## 部署
 
+### 本机 / 自有服务器（Docker Compose）
+
+```bash
+docker compose up -d --build
+# 打开 http://localhost:3000
+```
+
+数据目录挂载在 `./data`，改 `docker-compose.yml` 里的 `HR_USER` / `HR_PASS` / `AUTH_SECRET` 后重启生效；容器自带 `/api/health` 健康检查。
+
 ### Railway（推荐）
 
 仓库已初始化 git 并附带 `.github/workflows/ci.yml`，可直接推送到 GitHub：
