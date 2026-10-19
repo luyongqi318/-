@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   if (file.size > 8 * 1024 * 1024) return NextResponse.json({ error: "文件超过 8MB，请拆分后再传" }, { status: 400 });
 
   try {
-    const { rows } = await parseTable(file);
+    const { rows } = await parseTable(file, [...entity.headers]);
     if (rows.length === 0) return NextResponse.json({ error: "没有解析到数据行，请检查表头与内容" }, { status: 400 });
     if (rows.length > 2000) return NextResponse.json({ error: "单次最多导入 2000 行，请拆分文件" }, { status: 400 });
     const result = importRows(entityKey, rows);

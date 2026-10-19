@@ -14,7 +14,21 @@ const { DatabaseSync } = requireNative("node:sqlite") as {
 
 export type DB = any;
 
-const DB_PATH = process.env.HR_DB_PATH || path.join(process.cwd(), "data", "hr.db");
+/**
+ * 数据库位置：
+ * 1. 优先 HR_DB_PATH（容器里固定为 /app/data/hr.db，挂载磁盘）
+ * 2. standalone 启动时 Next 会把 cwd 切到 .next/standalone，此时回退到项目根的 data/，
+ *    避免每次重新构建（.next 被清空）就丢库
+ */
+function resolveDbPath(): string {
+  if (process.env.HR_DB_PATH) return process.env.HR_DB_PATH;
+  const cwd = process.cwd();
+  const standaloneSuffix = path.join(".next", "standalone");
+  const base = cwd.endsWith(standaloneSuffix) ? path.resolve(cwd, "..", "..") : cwd;
+  return path.join(base, "data", "hr.db");
+}
+
+const DB_PATH = resolveDbPath();
 
 const globalRef = globalThis as typeof globalThis & { __hrDb?: DB };
 

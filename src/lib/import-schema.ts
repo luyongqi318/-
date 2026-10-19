@@ -74,7 +74,20 @@ function parseDelimited(text: string): string[][] {
   return rows.filter((r) => r.some((cell) => String(cell).trim() !== ""));
 }
 
-export async function parseTable(file: File): Promise<ParsedTable> {
+function normalizeHeader(raw: string): string {
+  return String(raw ?? "")
+    .replace(/\uFEFF/g, "")
+    .replace(/\s+/g, "")
+    .replace(/（/g, "(")
+    .replace(/）/g, ")")
+    .replace(/[：:]/g, "");
+}
+
+/**
+ * 解析上传文件（CSV / Excel）。
+ * 传入 expected 表头时，会在前 5 行里自动寻找真正的表头行，兼容「标题行 + 空行 + 表头」的常见排版。
+ */
+export async function parseTable(file: File, expected: string[] = []): Promise<ParsedTable> {
   const name = (file.name || "").toLowerCase();
   const buffer = await file.arrayBuffer();
   let matrix: string[][] = [];
@@ -91,8 +104,20 @@ export async function parseTable(file: File): Promise<ParsedTable> {
   matrix = matrix.filter((row) => row.some((cell) => cell !== ""));
   if (matrix.length === 0) return { headers: [], rows: [] };
 
-  const headers = matrix[0].map((h) => h.replace(/\s+/g, ""));
-  const rows = matrix.slice(1).map((row) => {
+  const expectedSet = new Set(expected.map(normalizeHeader));
+  let headerIndex = 0;
+  if (expectedSet.size > 0) {
+    for (let i = 0; i < Math.min(5, matrix.length); i += 1) {
+      const hits = matrix[i].filter((cell) => expectedSet.has(normalizeHeader(cell))).length;
+      if (hits >= 2) {
+        headerIndex = i;
+        break;
+      }
+    }
+  }
+
+  const headers = matrix[headerIndex].map(normalizeHeader);
+  const rows = matrix.slice(headerIndex + 1).map((row) => {
     const obj: Record<string, string> = {};
     headers.forEach((h, idx) => {
       if (h) obj[h] = row[idx] ?? "";

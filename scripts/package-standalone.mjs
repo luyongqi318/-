@@ -20,5 +20,4 @@ if (fs.existsSync(publicSrc)) {
   fs.cpSync(publicSrc, path.join(standalone, "public"), { recursive: true });
 }
 
-fs.mkdirSync(path.join(standalone, "data"), { recursive: true });
-console.log("standalone packaged: static + public + data");
+console.log("standalone packaged: static + public");
