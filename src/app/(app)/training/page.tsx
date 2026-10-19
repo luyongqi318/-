@@ -1,4 +1,4 @@
-import { AlertTriangle, BookOpen, CheckCircle2, Clock, GraduationCap } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, Clock, Download, GraduationCap } from "lucide-react";
 import { StatCard } from "@/components/charts";
 import { AssignTrainingDialog } from "@/components/AssignTrainingDialog";
 import { Badge, PageHeader, Progress } from "@/components/ui";
@@ -33,7 +33,14 @@ export default async function TrainingPage({
       <PageHeader
         title="培训与入职"
         desc={`${courses.length} 门课程 · ${data.stats.total} 项学习任务 · 完成率 ${data.stats.rate}%`}
-        actions={<AssignTrainingDialog employees={employees} courses={courseOptions} />}
+        actions={
+          <>
+            <a className="btn" href="/api/export?type=training">
+              <Download size={15} /> 导出培训任务
+            </a>
+            <AssignTrainingDialog employees={employees} courses={courseOptions} />
+          </>
+        }
       />
 
       <div className="grid kpi-grid">

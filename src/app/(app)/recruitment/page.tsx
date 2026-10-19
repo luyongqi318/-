@@ -1,4 +1,4 @@
-import { Briefcase, CalendarDays, Timer, Users } from "lucide-react";
+import { Briefcase, CalendarDays, Download, Timer, Users } from "lucide-react";
 import { StatCard } from "@/components/charts";
 import { CandidateStageSelect } from "@/components/CandidateStageSelect";
 import { NewJobDialog } from "@/components/NewJobDialog";
@@ -25,7 +25,14 @@ export default function RecruitmentPage() {
       <PageHeader
         title="招聘管理"
         desc={`在招 ${stats.openJobs} 个职位 · 累计候选人 ${stats.candidates} 人 · 平均招聘周期 ${stats.avgTimeToHire} 天`}
-        actions={<NewJobDialog departments={departments} />}
+        actions={
+          <>
+            <a className="btn" href="/api/export?type=candidates">
+              <Download size={15} /> 导出候选人
+            </a>
+            <NewJobDialog departments={departments} />
+          </>
+        }
       />
 
       <div className="grid kpi-grid">

@@ -1,4 +1,4 @@
-import { CalendarClock, FileWarning, Search, UserPlus, Users } from "lucide-react";
+import { CalendarClock, Download, FileWarning, Search, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { StatCard } from "@/components/charts";
 import { Avatar, Badge, PageHeader } from "@/components/ui";
@@ -49,6 +49,11 @@ export default async function EmployeesPage({
       <PageHeader
         title="员工档案"
         desc={`在编 ${stats.head} 人 · 试用期 ${stats.probation} 人 · 合同 30 天内到期 ${stats.expiring} 人`}
+        actions={
+          <a className="btn" href="/api/export?type=employees">
+            <Download size={15} /> 导出花名册
+          </a>
+        }
       />
 
       <div className="grid kpi-grid">

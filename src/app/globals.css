@@ -508,6 +508,13 @@ textarea {
   gap: 18px;
 }
 
+/* 网格子项允许被压缩，避免表格/图表把卡片撑出视口 */
+.grid > *,
+.two-col-wide > *,
+.kpi-grid > * {
+  min-width: 0;
+}
+
 .cols-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -2193,4 +2200,129 @@ table.data tbody tr:hover .cell-main {
   height: auto;
   min-height: 168px;
   line-height: 1.8;
+}
+
+/* ---------------- 移动端：把侧栏收成顶部横向导航 ---------------- */
+@media (max-width: 900px) {
+  .sidebar {
+    position: static;
+    height: auto;
+    min-width: 0;
+    padding: 14px 14px 6px;
+    display: block;
+  }
+  .brand {
+    padding: 0 0 12px;
+    border-bottom: 1px solid rgba(217, 199, 168, 0.14);
+  }
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
+  }
+  .brand-name {
+    font-size: 13px;
+  }
+  .nav-group-label,
+  .sidebar-foot {
+    display: none;
+  }
+  .nav {
+    flex-direction: row;
+    gap: 6px;
+    overflow-x: auto;
+    max-width: 100%;
+    padding: 8px 0 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+  .nav-link {
+    flex: none;
+    white-space: nowrap;
+    padding: 7px 11px;
+    font-size: 12.5px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .nav-link.active::before {
+    display: none;
+  }
+  .nav-link.active {
+    border-color: rgba(200, 168, 106, 0.45);
+  }
+
+  .topbar {
+    height: 56px;
+    padding: 0 14px;
+  }
+  .topbar-date,
+  .user-meta {
+    display: none;
+  }
+  .crumb {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .content {
+    padding: 18px 14px 96px;
+  }
+  .page-title {
+    font-size: 22px;
+  }
+  .page-head {
+    margin-bottom: 18px;
+  }
+
+  .cols-2,
+  .cols-3,
+  .two-col-wide,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .kpi-6,
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .stat {
+    padding: 14px 14px 12px;
+  }
+  .stat-icon {
+    width: 24px;
+    height: 24px;
+    right: 12px;
+    top: 12px;
+  }
+  .stat-icon svg {
+    width: 13px;
+    height: 13px;
+  }
+  .stat-value {
+    font-size: 26px;
+  }
+  .stat-foot {
+    font-size: 10px;
+  }
+
+  .agent-fab {
+    right: 14px;
+    bottom: 16px;
+    padding: 10px 15px;
+    font-size: 12px;
+  }
+  .agent-panel {
+    left: 8px;
+    right: 8px;
+    bottom: 70px;
+    width: auto;
+    height: 76vh;
+  }
+  .sch-person {
+    min-width: 120px;
+  }
+  .schedule {
+    grid-template-columns: 120px repeat(7, minmax(74px, 1fr));
+  }
 }
