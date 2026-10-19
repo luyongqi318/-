@@ -9,6 +9,7 @@ const TITLES: Record<string, string> = {
   "/recruitment": "招聘管理",
   "/training": "培训与入职",
   "/employees": "员工档案",
+  "/data": "数据投喂",
   "/scheduling": "排班与考勤",
   "/performance": "绩效评估",
   "/agent": "AI 智能体",

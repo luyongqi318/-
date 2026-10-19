@@ -2187,3 +2187,10 @@ table.data tbody tr:hover .cell-main {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* 表单里的多行文本框不应被 .field .input 的固定高度压扁 */
+.field textarea.input {
+  height: auto;
+  min-height: 168px;
+  line-height: 1.8;
+}

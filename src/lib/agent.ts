@@ -9,6 +9,7 @@ import {
   getTraining,
 } from "./queries";
 import { getAgentConfig } from "./settings";
+import { findKnowledge, knowledgePrompt } from "./knowledge";
 
 const BASE_URL = (process.env.AGENT_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "");
 const MODEL = process.env.AGENT_MODEL || "deepseek-chat";
@@ -33,6 +34,13 @@ const SYSTEM_PROMPT = `你是「上海东锦江希尔顿逸林酒店」的人力
 - 离职：提前 30 天书面申请，完成交接清单与资产归还。
 
 【可用工具】组织概览、在招职位、招聘漏斗、培训进度、考勤排班、绩效、员工检索。`;
+
+/** 系统提示 = 基础规则 + 用户投喂的制度资料（优先生效）。 */
+function buildSystemPrompt(): string {
+  const kb = knowledgePrompt();
+  if (!kb) return SYSTEM_PROMPT;
+  return `${SYSTEM_PROMPT}\n\n【酒店内部资料（用户投喂，回答制度与流程问题时优先引用）】\n${kb}`;
+}
 
 const TOOLS = [
   {
@@ -303,7 +311,7 @@ export async function askAgent(
     return demoAnswer(clean);
   }
 
-  const messages: ChatMessage[] = [{ role: "system", content: SYSTEM_PROMPT }, ...clean];
+  const messages: ChatMessage[] = [{ role: "system", content: buildSystemPrompt() }, ...clean];
   const used: ToolCall[] = [];
 
   for (let round = 0; round < 4; round += 1) {
@@ -441,6 +449,18 @@ function demoAnswer(history: { role: "user" | "assistant"; content: string }[]) 
       model: "本地演示模式",
       tools: used,
       reply: `【${job.department} · ${job.title}】招聘 JD（演示模式草稿，可直接改用）\n\n岗位职责：\n1. 按希尔顿品牌服务标准完成当班岗位的日常服务与交接；\n2. 主动识别宾客需求，处理常见问询并将复杂问题升级至主管；\n3. 维护岗位区域整洁、物资齐备，执行安全与卫生规范；\n4. 参加班前会、服务复盘与月度培训，完成考核。\n\n任职要求：\n1. 高中及以上学历，有酒店或高端服务业经验优先；\n2. 普通话流利，具备基础英语沟通能力；\n3. 能适应早/中/晚三班轮班，形象端正、服务意识强；\n4. 持健康证（餐饮、厨房岗位另需食品安全培训合格）。\n\n薪资：${job.salary_min}–${job.salary_max} 元/月，另有班次补贴与全勤奖。\n\n配置 DEEPSEEK_API_KEY 后，我可以按你的具体要求重写这份 JD。`,
+    };
+  }
+
+  const kbHit = findKnowledge(question);
+  if (kbHit) {
+    used.push({ tool: "knowledge_base", ok: true });
+    const excerpt = kbHit.content.slice(0, 600);
+    return {
+      demo: true,
+      model: "本地演示模式",
+      tools: used,
+      reply: `【${kbHit.title}】\n${excerpt}${kbHit.content.length > 600 ? "…" : ""}\n\n（来自你投喂的资料；配置 API Key 后可以基于全文做归纳与追问。）`,
     };
   }
 

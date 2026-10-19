@@ -141,6 +141,13 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS knowledge (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_employees_dept ON employees(department_id);
 CREATE INDEX IF NOT EXISTS idx_candidates_job ON candidates(job_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_emp ON enrollments(employee_id);

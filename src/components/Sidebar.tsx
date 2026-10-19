@@ -6,6 +6,7 @@ import {
   Settings,
   Sparkles,
   Target,
+  Upload,
   Users,
 } from "lucide-react";
 import { NavLink } from "./NavLink";
@@ -27,6 +28,7 @@ export function Sidebar({ interviewBadge }: { interviewBadge?: number }) {
         <NavLink href="/recruitment" label="招聘管理" icon={<Briefcase />} badge={interviewBadge} />
         <NavLink href="/training" label="培训与入职" icon={<GraduationCap />} />
         <NavLink href="/employees" label="员工档案" icon={<Users />} />
+        <NavLink href="/data" label="数据投喂" icon={<Upload />} />
       </nav>
 
       <div className="nav-group-label">运营</div>
