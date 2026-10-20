@@ -1,6 +1,8 @@
 import { Database, FileText, Lightbulb, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { AgentChat } from "@/components/AgentChat";
+import { ClearChatButton } from "@/components/ClearChatButton";
 import { Badge, PageHeader } from "@/components/ui";
+import { listChat } from "@/lib/chat";
 import { getAgentConfig } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -8,13 +10,22 @@ export const dynamic = "force-dynamic";
 export default function AgentPage() {
   const config = getAgentConfig();
   const hasKey = Boolean(config.apiKey);
+  const history = listChat(40).map((item) => ({
+    role: item.role === "user" ? ("user" as const) : ("assistant" as const),
+    content: item.content,
+  }));
 
   return (
     <>
       <PageHeader
         title="AI 智能体"
         desc="读取招聘、培训、员工、排班与绩效数据，回答问题并生成可用文档"
-        actions={<Badge tone={hasKey ? "green" : "amber"}>{hasKey ? "已接入模型 API" : "演示模式（未配置 Key）"}</Badge>}
+        actions={
+          <>
+            {history.length > 0 ? <ClearChatButton /> : null}
+            <Badge tone={hasKey ? "green" : "amber"}>{hasKey ? "已接入模型 API" : "演示模式（未配置 Key）"}</Badge>
+          </>
+        }
       />
 
       <div className="agent-page">
@@ -42,6 +53,7 @@ export default function AgentPage() {
           <AgentChat
             variant="page"
             configured={hasKey}
+            initialMessages={history}
             suggestions={[
               "本周招聘进展如何？哪个岗位缺口最大？",
               "给餐饮部新员工做一份培训方案",

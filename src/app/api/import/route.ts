@@ -1,63 +1,11 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { aiNormalizeImport } from "@/lib/ai-import";
 import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
-import { ALL_HEADERS, ENTITIES, getEntity, importAuto, importRows, parseTable, remapRows } from "@/lib/import-schema";
+import { ALL_HEADERS, getEntity, importAuto, importRows, parseTable } from "@/lib/import-schema";
 import { clientIp } from "@/lib/rate-limit";
-import { getAgentConfig } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
-
-/** 规则识别不了时，让模型判断类型与列映射；失败就返回 null，走人工指定。 */
-async function classifyWithModel(
-  headers: string[],
-  sample: Record<string, string>[],
-): Promise<{ entity: string; mapping: Record<string, string> } | null> {
-  const config = getAgentConfig();
-  if (!config.apiKey) return null;
-
-  const catalogue = ENTITIES.map((entity) => ({ key: entity.key, label: entity.label, columns: [...entity.headers] }));
-  const prompt = [
-    "你是酒店 HR 数据分类器。根据文件表头和样例行，判断属于哪类数据，并把文件列映射到标准列。",
-    `文件表头：${JSON.stringify(headers)}`,
-    `样例行：${JSON.stringify(sample)}`,
-    `可选类型与标准列：${JSON.stringify(catalogue)}`,
-    '只输出 JSON，不要解释：{"entity":"employees","mapping":{"标准列":"文件列"}}；无法判断则输出 {"entity":null}。',
-  ].join("\n");
-
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20000);
-    const res = await fetch(`${config.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
-      body: JSON.stringify({
-        model: config.model,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0,
-        max_tokens: 400,
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = String(data?.choices?.[0]?.message?.content ?? "");
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    const parsed = JSON.parse(match[0]) as { entity?: string; mapping?: Record<string, string> };
-    const entity = parsed.entity ? getEntity(parsed.entity) : null;
-    if (!entity || !parsed.mapping) return null;
-    const allowed = new Set(entity.headers as readonly string[]);
-    const mapping: Record<string, string> = {};
-    for (const [target, source] of Object.entries(parsed.mapping)) {
-      if (allowed.has(target) && headers.includes(source)) mapping[target] = source;
-    }
-    return Object.keys(mapping).length >= 1 ? { entity: entity.key, mapping } : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "请先登录" }, { status: 401 });
@@ -86,22 +34,29 @@ export async function POST(req: Request) {
     if (rows.length > 2000) return NextResponse.json({ error: "单次最多导入 2000 行，请拆分文件" }, { status: 400 });
 
     if (isAuto) {
-      let auto = importAuto(headers, rows);
-      if (!auto) {
-        // 规则识别不出来时，交给模型判断属于哪类数据、列如何对应
-        const ai = await classifyWithModel(headers, rows.slice(0, 3));
-        if (ai) {
-          const result = importRows(ai.entity, remapRows(rows, ai.mapping));
-          auto = {
-            result,
-            detected: {
-              entity: ai.entity,
-              label: getEntity(ai.entity)?.label ?? ai.entity,
-              matched: Object.keys(ai.mapping).length,
-              total: getEntity(ai.entity)?.headers.length ?? 0,
-              columns: Object.entries(ai.mapping).map(([target, source]) => ({ target, source })),
-            },
-          };
+      const auto = importAuto(headers, rows);
+      if (!auto || auto.result.inserted === 0) {
+        // 规则对不上，直接把内容交给模型整理成标准记录再入库
+        const ai = await aiNormalizeImport(headers, rows);
+        if (ai && ai.inserted > 0) {
+          const label = getEntity(ai.entity)?.label ?? ai.entity;
+          logAudit(
+            "导入数据",
+            `${label}（DeepSeek 整理）：新增 ${ai.inserted}，跳过 ${ai.skipped}，错误 ${ai.errors.length}`,
+            session.u,
+            clientIp(req),
+          );
+          return NextResponse.json({
+            ok: true,
+            entity: ai.entity,
+            label,
+            total: rows.length,
+            inserted: ai.inserted,
+            skipped: ai.skipped,
+            errors: ai.errors,
+            notes: [`由 DeepSeek 整理后导入（${ai.batches} 批）`],
+            detected: { entity: ai.entity, label, matched: 0, total: 0, columns: [] },
+          });
         }
       }
       if (!auto) {

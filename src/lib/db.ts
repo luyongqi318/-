@@ -287,6 +287,20 @@ function migrate(db: DB): void {
     version = 3;
   }
 
+  if (version < 4) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        tools TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(created_at);
+    `);
+    version = 4;
+  }
+
   if (version !== current) {
     db.exec(`PRAGMA user_version = ${version}`);
   }

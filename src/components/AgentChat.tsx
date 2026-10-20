@@ -79,12 +79,14 @@ export function AgentChat({
   variant = "dock",
   suggestions = DEFAULT_SUGGESTIONS,
   configured = false,
+  initialMessages = [],
 }: {
   variant?: "dock" | "page";
   suggestions?: string[];
   configured?: boolean;
+  initialMessages?: { role: "user" | "assistant"; content: string }[];
 }) {
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const [messages, setMessages] = useState<Msg[]>(initialMessages.map((m) => ({ role: m.role, content: m.content })));
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

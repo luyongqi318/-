@@ -80,7 +80,9 @@ function normalizeHeader(raw: string): string {
     .replace(/\s+/g, "")
     .replace(/（/g, "(")
     .replace(/）/g, ")")
-    .replace(/[：:]/g, "");
+    .replace(/[：:]/g, "")
+    .replace(/\.$/, "")
+    .toLowerCase();
 }
 
 /**
@@ -187,14 +189,45 @@ const STAGES = ["新投递", "简历筛选", "面试中", "待发 offer", "已�
 const ENROLL_STATUS = ["未开始", "学习中", "已完成", "已逾期"];
 const LEVELS = ["员工", "主管", "经理", "总监"];
 
+const MONTHS: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
+  january: 1, february: 2, march: 3, april: 4, june: 6, july: 7,
+  august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** 兼容 2026-1-5 / 2026/01/05 / 2026年1月5日 / 01-Jul-2019 / Jul 1, 2019 */
 function normalizeDate(raw: string, fallback = todayIso()): string {
   const value = String(raw ?? "").trim();
   if (!value) return fallback;
-  const cleaned = value.replace(/[年月]/g, "-").replace(/[日]/g, "").replace(/[./]/g, "-");
-  const match = cleaned.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (!match) return "";
-  const [, y, m, d] = match;
-  return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+
+  const cleaned = value.replace(/[年月]/g, "-").replace(/日/g, "").replace(/[./]/g, "-").trim();
+  const iso = cleaned.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) return `${iso[1]}-${pad2(Number(iso[2]))}-${pad2(Number(iso[3]))}`;
+
+  const dmy = cleaned.match(/^(\d{1,2})[-\s]([A-Za-z]{3,9})[-\s](\d{2,4})$/);
+  if (dmy) {
+    const month = MONTHS[dmy[2].toLowerCase()];
+    if (month) {
+      const year = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
+      return `${year}-${pad2(month)}-${pad2(Number(dmy[1]))}`;
+    }
+  }
+
+  const mdy = cleaned.match(/^([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{2,4})$/);
+  if (mdy) {
+    const month = MONTHS[mdy[1].toLowerCase()];
+    if (month) {
+      const year = mdy[3].length === 2 ? `20${mdy[3]}` : mdy[3];
+      return `${year}-${pad2(month)}-${pad2(Number(mdy[2]))}`;
+    }
+  }
+
+  return "";
 }
 
 function toInt(raw: string, fallback = 0): number {
@@ -482,18 +515,18 @@ const ENTITY_META: Record<
   employees: {
     required: ["姓名", "部门"],
     aliases: {
-      工号: ["员工编号", "员工号", "编号"],
-      姓名: ["名字", "员工姓名"],
-      性别: ["性别"],
-      手机号: ["电话", "联系电话", "手机"],
-      邮箱: ["电子邮箱", "email", "Email"],
-      部门: ["所属部门", "部门名称"],
-      职位: ["岗位", "岗位名称", "职务"],
-      级别: ["职级"],
-      入职日期: ["入职时间", "入职日", "到岗日期"],
-      状态: ["在职状态"],
-      合同到期: ["合同到期日", "合同截止日期"],
-      月薪: ["薪资", "工资", "月工资"],
+      工号: ["员工编号", "员工号", "编号", "HotelNo.", "Hotel No.", "EmpNo", "EmployeeNo", "Employee No", "StaffNo", "Staff ID", "工号/编号"],
+      姓名: ["名字", "员工姓名", "C/Name", "Name", "ChineseName", "Chinese Name", "FullName", "Full Name", "Employee Name"],
+      性别: ["Gender", "Sex"],
+      手机号: ["电话", "联系电话", "手机", "Phone", "Mobile", "PhoneNo", "Phone No", "Telephone"],
+      邮箱: ["电子邮箱", "email", "Email", "EmailAddress", "Email Address", "E-mail"],
+      部门: ["所属部门", "部门名称", "Department", "Dept", "Dept.", "Division"],
+      职位: ["岗位", "岗位名称", "职务", "PositionChinese", "Position", "Position Chinese", "JobTitle", "Job Title", "Title"],
+      级别: ["职级", "Level", "Grade"],
+      入职日期: ["入职时间", "入职日", "到岗日期", "DateJoined", "Date Joined", "HireDate", "Hire Date", "JoinDate", "Join Date", "StartDate", "Start Date"],
+      状态: ["在职状态", "Status", "EmploymentStatus", "Employment Status"],
+      合同到期: ["合同到期日", "合同截止日期", "ContractEnd", "Contract End", "ContractEndDate", "Contract End Date"],
+      月薪: ["薪资", "工资", "月工资", "Salary", "MonthlySalary", "Monthly Salary"],
     },
   },
   jobs: {
