@@ -106,7 +106,7 @@ export function AgentChat({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [demo, setDemo] = useState(!configured);
-  const [model, setModel] = useState(configured ? "DeepSeek" : "本地演示模式");
+  const [model, setModel] = useState(configured ? "DeepSeek-V4.1-Flash · Max" : "本地演示模式");
   const [exporting, setExporting] = useState("");
   const [pending, setPending] = useState<{ file: File; preview: string } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AgentChat } from "./AgentChat";
 
-export function AgentDock() {
+export function AgentDock({ configured = false }: { configured?: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -54,7 +54,7 @@ export function AgentDock() {
               <X size={15} />
             </button>
           </div>
-          <AgentChat variant="dock" />
+          <AgentChat variant="dock" configured={configured} />
         </div>
       ) : null}
     </>
