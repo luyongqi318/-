@@ -1,11 +1,13 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { aiNormalizeImport } from "@/lib/ai-import";
 import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/auth";
-import { ALL_HEADERS, getEntity, importAuto, importRows, parseTable } from "@/lib/import-schema";
+import { runImport, type ImportMode } from "@/lib/import-batches";
+import { ALL_HEADERS, getEntity, mapRowsForEntity, parseTable } from "@/lib/import-schema";
 import { clientIp } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "请先登录" }, { status: 401 });
@@ -18,6 +20,7 @@ export async function POST(req: Request) {
   }
 
   const entityKey = String(form.get("entity") ?? "");
+  const mode: ImportMode = String(form.get("mode") ?? "") === "append" ? "append" : "replace";
   const isAuto = entityKey === "auto";
   const entity = isAuto ? null : getEntity(entityKey);
   if (!isAuto && !entity) return NextResponse.json({ error: "未知的导入类型" }, { status: 400 });
@@ -34,52 +37,63 @@ export async function POST(req: Request) {
     if (rows.length > 2000) return NextResponse.json({ error: "单次最多导入 2000 行，请拆分文件" }, { status: 400 });
 
     if (isAuto) {
-      const auto = importAuto(headers, rows);
-      if (!auto || auto.result.inserted === 0) {
-        // 规则对不上，直接把内容交给模型整理成标准记录再入库
-        const ai = await aiNormalizeImport(headers, rows);
-        if (ai && ai.inserted > 0) {
-          const label = getEntity(ai.entity)?.label ?? ai.entity;
-          logAudit(
-            "导入数据",
-            `${label}（DeepSeek 整理）：新增 ${ai.inserted}，跳过 ${ai.skipped}，错误 ${ai.errors.length}`,
-            session.u,
-            clientIp(req),
-          );
-          return NextResponse.json({
-            ok: true,
-            entity: ai.entity,
-            label,
-            total: rows.length,
-            inserted: ai.inserted,
-            skipped: ai.skipped,
-            errors: ai.errors,
-            notes: [`由 DeepSeek 整理后导入（${ai.batches} 批）`],
-            detected: { entity: ai.entity, label, matched: 0, total: 0, columns: [] },
-          });
-        }
-      }
-      if (!auto) {
-        return NextResponse.json(
-          {
-            error:
-              "没能识别出数据类型。请确认表头里有「姓名 / 部门 / 职位 / 课程名称 / 应聘职位」这类字段，或在下方按类型指定导入。",
-          },
-          { status: 422 },
+      const mapped = mapRowsForEntity(headers, rows);
+      if (mapped && mapped.rows.length) {
+        const out = runImport(mapped.entity, mapped.rows, mode, session.u);
+        logAudit(
+          "导入数据",
+          `${out.result.label}（自动识别 · ${mode === "replace" ? "覆盖" : "追加"}）：新增 ${out.result.inserted}，替换旧数据 ${out.replaced} 条`,
+          session.u,
+          clientIp(req),
         );
+        return NextResponse.json({
+          ok: true,
+          ...out.result,
+          replaced: out.replaced,
+          batchId: out.batchId,
+          mode,
+          detected: mapped.detection,
+        });
       }
-      logAudit(
-        "导入数据",
-        `${auto.detected.label}（自动识别）：新增 ${auto.result.inserted}，跳过 ${auto.result.skipped}，错误 ${auto.result.errors.length}`,
-        session.u,
-        clientIp(req),
+
+      // 规则对不上：让 DeepSeek 整理成标准记录，再按同样的覆盖/追加规则入库
+      const ai = await aiNormalizeImport(headers, rows);
+      if (ai) {
+        const out = runImport(ai.entity, ai.records, mode, session.u);
+        logAudit(
+          "导入数据",
+          `${out.result.label}（DeepSeek 整理 · ${mode === "replace" ? "覆盖" : "追加"}）：新增 ${out.result.inserted}，替换旧数据 ${out.replaced} 条`,
+          session.u,
+          clientIp(req),
+        );
+        return NextResponse.json({
+          ok: true,
+          ...out.result,
+          replaced: out.replaced,
+          batchId: out.batchId,
+          mode,
+          notes: [`由 DeepSeek 整理后导入（${ai.batches} 批）`],
+          detected: { entity: ai.entity, label: getEntity(ai.entity)?.label ?? ai.entity, matched: 0, total: 0, columns: [] },
+        });
+      }
+
+      return NextResponse.json(
+        {
+          error:
+            "没能识别出数据类型。请确认表头里有「姓名 / 部门 / 职位 / 课程名称 / 应聘职位」这类字段，或在下方按类型指定导入。",
+        },
+        { status: 422 },
       );
-      return NextResponse.json({ ok: true, ...auto.result, detected: auto.detected });
     }
 
-    const result = importRows(entityKey, rows);
-    logAudit("导入数据", `${result.label}：新增 ${result.inserted}，跳过 ${result.skipped}，错误 ${result.errors.length}`, session.u, clientIp(req));
-    return NextResponse.json({ ok: true, ...result });
+    const out = runImport(entityKey, rows, mode, session.u);
+    logAudit(
+      "导入数据",
+      `${out.result.label}（${mode === "replace" ? "覆盖" : "追加"}）：新增 ${out.result.inserted}，替换旧数据 ${out.replaced} 条`,
+      session.u,
+      clientIp(req),
+    );
+    return NextResponse.json({ ok: true, ...out.result, replaced: out.replaced, batchId: out.batchId, mode });
   } catch (err) {
     const message = err instanceof Error ? err.message : "导入失败";
     return NextResponse.json({ error: `导入失败：${message}` }, { status: 500 });

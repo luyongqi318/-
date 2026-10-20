@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default function AgentPage() {
   const config = getAgentConfig();
   const hasKey = Boolean(config.apiKey);
-  const history = listChat(40).map((item) => ({
+  const history = listChat(400).map((item) => ({
     role: item.role === "user" ? ("user" as const) : ("assistant" as const),
     content: item.content,
   }));

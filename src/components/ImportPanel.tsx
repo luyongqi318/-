@@ -11,6 +11,8 @@ type Result = {
   total: number;
   inserted: number;
   skipped: number;
+  replaced?: number;
+  batchId?: number;
   errors: { line: number; message: string }[];
   notes: string[];
 };
@@ -18,6 +20,7 @@ type Result = {
 export function ImportPanel({ entities }: { entities: Entity[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
+  const [mode, setMode] = useState<"replace" | "append">("replace");
   const [results, setResults] = useState<Record<string, Result>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -27,6 +30,7 @@ export function ImportPanel({ entities }: { entities: Entity[] }) {
     try {
       const form = new FormData();
       form.append("entity", entityKey);
+      form.append("mode", mode);
       form.append("file", file);
       const res = await fetch("/api/import", { method: "POST", body: form });
       const data = await res.json();
@@ -45,6 +49,15 @@ export function ImportPanel({ entities }: { entities: Entity[] }) {
       <AutoImportCard />
       <details className="import-types" open>
         <summary>按类型导入（可下载模板）</summary>
+        <div className="flex" style={{ gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+          <span className="muted" style={{ fontSize: 11.5 }}>
+            这里也遵循上面的导入方式
+          </span>
+          <select className="select" value={mode} onChange={(e) => setMode(e.target.value as "replace" | "append")} style={{ width: 200 }}>
+            <option value="replace">覆盖：替换该类型的现有数据</option>
+            <option value="append">追加：保留现有数据</option>
+          </select>
+        </div>
         <div className="grid cols-2" style={{ marginTop: 16 }}>
           {entities.map((entity) => {
         const result = results[entity.key];
@@ -102,6 +115,7 @@ export function ImportPanel({ entities }: { entities: Entity[] }) {
                 <div className="flex" style={{ color: "#2c6a58", gap: 6 }}>
                   <CheckCircle2 size={14} />
                   新增 {result.inserted} 条 · 跳过 {result.skipped} 条 · 错误 {result.errors.length} 条
+                  {result.replaced ? ` · 已替换旧数据 ${result.replaced} 条` : ""}
                 </div>
                 {result.notes.length > 0 ? (
                   <ul className="muted" style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 11 }}>
@@ -111,13 +125,20 @@ export function ImportPanel({ entities }: { entities: Entity[] }) {
                   </ul>
                 ) : null}
                 {result.errors.length > 0 ? (
-                  <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 11, color: "#9e3b3b" }}>
-                    {result.errors.slice(0, 4).map((err, i) => (
-                      <li key={i}>
-                        第 {err.line} 行：{err.message}
-                      </li>
-                    ))}
-                  </ul>
+                  <div style={{ marginTop: 6 }}>
+                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#9e3b3b" }}>
+                      {result.errors.slice(0, 4).map((err, i) => (
+                        <li key={i}>
+                          第 {err.line} 行：{err.message}
+                        </li>
+                      ))}
+                    </ul>
+                    {result.batchId ? (
+                      <a className="btn btn-ghost" href={`/api/import/batches/${result.batchId}/errors`} style={{ padding: "2px 0", fontSize: 11 }}>
+                        下载全部 {result.errors.length} 条错误明细
+                      </a>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             ) : null}

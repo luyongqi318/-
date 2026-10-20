@@ -11,8 +11,9 @@ import {
 import { getAgentConfig } from "./settings";
 import { findKnowledge, knowledgePrompt } from "./knowledge";
 
-const BASE_URL = (process.env.AGENT_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "");
-const MODEL = process.env.AGENT_MODEL || "deepseek-chat";
+const MAX_HISTORY_MESSAGES = 200;
+const MAX_MESSAGE_CHARS = 8000;
+const MAX_CONTEXT_CHARS = 24000;
 
 const SYSTEM_PROMPT = `你是「上海东锦江希尔顿逸林酒店」的人力资源智能助手，服务对象是酒店 HR 与部门负责人。
 
@@ -47,7 +48,7 @@ type 只支持 bar / pie；data 最多 10 项；数字必须来自工具查询�
 
 /** 系统提示 = 基础规则 + 用户投喂的制度资料（优先生效）。 */
 function buildSystemPrompt(): string {
-  const kb = knowledgePrompt();
+  const kb = knowledgePrompt(10, 20000);
   if (!kb) return SYSTEM_PROMPT;
   return `${SYSTEM_PROMPT}\n\n【酒店内部资料（用户投喂，回答制度与流程问题时优先引用）】\n${kb}`;
 }
@@ -294,7 +295,7 @@ async function callModel(
         tools: TOOLS,
         tool_choice: "auto",
         temperature: 0.25,
-        max_tokens: 3000,
+        max_tokens: 8000,
       }),
       signal: controller.signal,
     });
@@ -314,14 +315,25 @@ export async function askAgent(
   const config = getAgentConfig();
   const clean = history
     .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
-    .slice(-10)
-    .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+    .slice(-MAX_HISTORY_MESSAGES)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_MESSAGE_CHARS) }));
+
+  // 按字符预算保留尽量多的上下文（从最新往前取，避免超长对话把请求撑爆）
+  const budgeted: { role: "user" | "assistant"; content: string }[] = [];
+  let usedChars = 0;
+  for (let i = clean.length - 1; i >= 0; i -= 1) {
+    const item = clean[i];
+    if (usedChars + item.content.length > MAX_CONTEXT_CHARS && budgeted.length >= 2) break;
+    budgeted.unshift(item);
+    usedChars += item.content.length;
+  }
+  const context = budgeted.length ? budgeted : clean.slice(-2);
 
   if (!config.apiKey) {
     return demoAnswer(clean);
   }
 
-  const messages: ChatMessage[] = [{ role: "system", content: buildSystemPrompt() }, ...clean];
+  const messages: ChatMessage[] = [{ role: "system", content: buildSystemPrompt() }, ...context];
   const used: ToolCall[] = [];
 
   for (let round = 0; round < 4; round += 1) {

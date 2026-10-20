@@ -301,6 +301,33 @@ function migrate(db: DB): void {
     version = 4;
   }
 
+  if (version < 5) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS import_batches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        inserted INTEGER NOT NULL,
+        replaced INTEGER NOT NULL,
+        snapshot TEXT,
+        actor TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_batches_created ON import_batches(created_at);
+    `);
+    version = 5;
+  }
+
+  if (version < 6) {
+    try {
+      db.exec("ALTER TABLE import_batches ADD COLUMN errors_json TEXT");
+      db.exec("ALTER TABLE import_batches ADD COLUMN notes_json TEXT");
+    } catch {
+      /* 列已存在就跳过 */
+    }
+    version = 6;
+  }
+
   if (version !== current) {
     db.exec(`PRAGMA user_version = ${version}`);
   }

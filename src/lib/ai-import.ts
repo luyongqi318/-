@@ -1,16 +1,16 @@
-import { ENTITIES, importRows } from "./import-schema";
+import { ENTITIES } from "./import-schema";
 import { getAgentConfig } from "./settings";
 
 type Row = Record<string, string>;
 
 /**
- * 规则匹配失败时，直接把表格内容交给模型整理成标准记录再导入。
- * 这是「不要限制死格式」的兜底通道：列名、日期格式、部门写法都可以不标准。
+ * 规则匹配失败时，把表格内容交给模型整理成标准记录（只返回数据，不直接入库），
+ * 由调用方决定覆盖还是追加。列名、日期格式、部门写法都可以不标准。
  */
 export async function aiNormalizeImport(
   headers: string[],
   rows: Row[],
-): Promise<{ entity: string; inserted: number; skipped: number; errors: { line: number; message: string }[]; batches: number } | null> {
+): Promise<{ entity: string; records: Record<string, string>[]; batches: number } | null> {
   const config = getAgentConfig();
   if (!config.apiKey) return null;
 
@@ -20,9 +20,7 @@ export async function aiNormalizeImport(
   const batches = Math.min(maxBatches, Math.ceil(rows.length / batchSize));
 
   let entityKey = "";
-  let inserted = 0;
-  let skipped = 0;
-  const errors: { line: number; message: string }[] = [];
+  const records: Record<string, string>[] = [];
 
   for (let b = 0; b < batches; b += 1) {
     const slice = rows.slice(b * batchSize, (b + 1) * batchSize);
@@ -63,22 +61,12 @@ export async function aiNormalizeImport(
       const target = parsed.entity ? ENTITIES.find((e) => e.key === parsed.entity) : null;
       if (!target || !Array.isArray(parsed.records) || parsed.records.length === 0) return null;
       if (!entityKey) entityKey = target.key;
-      if (entityKey !== target.key) {
-        errors.push({ line: b * batchSize + 2, message: `这批数据被判断为${target.label}，与前面的${entityKey}不一致，已跳过` });
-        continue;
-      }
-
-      const result = importRows(target.key, parsed.records);
-      inserted += result.inserted;
-      skipped += result.skipped;
-      for (const err of result.errors) {
-        errors.push({ line: b * batchSize + err.line, message: err.message });
-      }
+      if (entityKey !== target.key) continue;
+      records.push(...parsed.records);
     } catch {
       return null;
     }
   }
 
-  if (!entityKey) return null;
-  return { entity: entityKey, inserted, skipped, errors: errors.slice(0, 20), batches };
+  return entityKey && records.length ? { entity: entityKey, records, batches } : null;
 }

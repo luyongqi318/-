@@ -644,6 +644,18 @@ export function detectEntity(headers: string[]): Detection | null {
   return best;
 }
 
+/** 只做识别与列映射，不写库——写库统一由 runImport 处理（便于覆盖/追加）。 */
+export function mapRowsForEntity(headers: string[], rows: Record<string, string>[]) {
+  const detection = detectEntity(headers);
+  if (!detection) return null;
+  return {
+    entity: detection.entity,
+    mapping: detection.mapping,
+    detection,
+    rows: remapRows(rows, detection.mapping),
+  };
+}
+
 export function remapRows(rows: Record<string, string>[], mapping: Record<string, string>): Record<string, string>[] {
   return rows.map((row) => {
     const out: Record<string, string> = {};

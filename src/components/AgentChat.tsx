@@ -112,7 +112,7 @@ export function AgentChat({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: next.map((m) => ({ role: m.role, content: m.content })),
+          messages: next.slice(-200).map((m) => ({ role: m.role, content: m.content })),
         }),
       });
       const data = (await res.json()) as {

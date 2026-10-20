@@ -10,6 +10,8 @@ type ImportResult = {
   total: number;
   inserted: number;
   skipped: number;
+  replaced?: number;
+  batchId?: number;
   errors: { line: number; message: string }[];
   notes: string[];
   detected?: Detected;
@@ -20,6 +22,7 @@ export function AutoImportCard() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<"replace" | "append">("replace");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState("");
 
@@ -30,6 +33,7 @@ export function AutoImportCard() {
     try {
       const form = new FormData();
       form.append("entity", "auto");
+      form.append("mode", mode);
       form.append("file", file);
       const res = await fetch("/api/import", { method: "POST", body: form });
       const data = await res.json();
@@ -55,6 +59,19 @@ export function AutoImportCard() {
           </p>
         </div>
         <span className="badge badge-gold">自动分类</span>
+      </div>
+
+      <div className="flex" style={{ gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+        <span className="muted" style={{ fontSize: 11.5 }}>
+          导入方式
+        </span>
+        <select className="select" value={mode} onChange={(e) => setMode(e.target.value as "replace" | "append")} style={{ width: 200 }}>
+          <option value="replace">覆盖：用新文件替换现有数据</option>
+          <option value="append">追加：保留现有数据继续添加</option>
+        </select>
+        <span className="muted" style={{ fontSize: 10.5 }}>
+          覆盖前会自动存档旧数据，可在页面下方「最近导入」下载
+        </span>
       </div>
 
       <div
@@ -109,6 +126,7 @@ export function AutoImportCard() {
           </div>
           <div className="muted" style={{ marginTop: 6 }}>
             共 {result.total} 行 · 新增 {result.inserted} 条 · 跳过 {result.skipped} 条
+            {result.replaced ? ` · 已替换旧数据 ${result.replaced} 条（批次 #${result.batchId}）` : ""}
             {result.errors.length ? ` · 错误 ${result.errors.length} 条` : ""}
           </div>
           {result.detected?.columns?.length ? (
@@ -121,13 +139,20 @@ export function AutoImportCard() {
             </div>
           ) : null}
           {result.errors.length ? (
-            <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 11, color: "#9e3b3b" }}>
-              {result.errors.slice(0, 3).map((err, i) => (
-                <li key={i}>
-                  第 {err.line} 行：{err.message}
-                </li>
-              ))}
-            </ul>
+            <div style={{ marginTop: 8 }}>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11, color: "#9e3b3b" }}>
+                {result.errors.slice(0, 3).map((err, i) => (
+                  <li key={i}>
+                    第 {err.line} 行：{err.message}
+                  </li>
+                ))}
+              </ul>
+              {result.batchId ? (
+                <a className="btn btn-ghost" href={`/api/import/batches/${result.batchId}/errors`} style={{ padding: "2px 0", fontSize: 11 }}>
+                  下载全部 {result.errors.length} 条错误明细
+                </a>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : null}

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "请先登录" }, { status: 401 });
-  return NextResponse.json({ items: listChat(60) });
+  return NextResponse.json({ items: listChat(400) });
 }
 
 export async function DELETE() {
