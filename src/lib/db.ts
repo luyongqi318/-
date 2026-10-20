@@ -177,7 +177,9 @@ function initDb(): DB {
   db.exec(SCHEMA);
   migrate(db);
   const row = db.prepare("SELECT COUNT(*) AS n FROM employees").get() as { n: number } | undefined;
-  if (!row || Number(row.n) === 0) {
+  const skipSeed =
+    (db.prepare("SELECT value FROM settings WHERE key = 'skip_seed'").get() as { value?: string } | undefined)?.value === "1";
+  if ((!row || Number(row.n) === 0) && !skipSeed) {
     seedDatabase(db);
   }
   return db;

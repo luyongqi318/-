@@ -75,9 +75,40 @@ export function SmtpForm({
       {error ? <div className="form-error">{error}</div> : null}
 
       <div className="form-grid">
+        <div className="field full">
+          <label>常用邮箱快捷配置</label>
+          <select
+            className="select"
+            defaultValue=""
+            onChange={(e) => {
+              const presets: Record<string, { host: string; port: string; secure: boolean }> = {
+                gmail: { host: "smtp.gmail.com", port: "465", secure: true },
+                qq: { host: "smtp.exmail.qq.com", port: "465", secure: true },
+                aliyun: { host: "smtp.qiye.aliyun.com", port: "465", secure: true },
+                aliyun_personal: { host: "smtp.aliyun.com", port: "465", secure: true },
+                "163": { host: "smtp.163.com", port: "465", secure: true },
+                outlook: { host: "smtp.office365.com", port: "587", secure: false },
+              };
+              const preset = presets[e.target.value];
+              if (preset) {
+                setHost(preset.host);
+                setPort(preset.port);
+                setSecure(preset.secure);
+              }
+            }}
+          >
+            <option value="">自定义</option>
+            <option value="gmail">Gmail（smtp.gmail.com · 465 · 需应用专用密码）</option>
+            <option value="qq">腾讯企业邮（smtp.exmail.qq.com · 465）</option>
+            <option value="aliyun">阿里云企业邮（smtp.qiye.aliyun.com · 465）</option>
+            <option value="aliyun_personal">阿里云个人邮（smtp.aliyun.com · 465）</option>
+            <option value="163">网易 163（smtp.163.com · 465）</option>
+            <option value="outlook">Outlook（smtp.office365.com · 587）</option>
+          </select>
+        </div>
         <div className="field">
           <label>SMTP 主机</label>
-          <input className="input" value={host} onChange={(e) => setHost(e.target.value)} placeholder="smtp.exmail.qq.com" />
+          <input className="input" value={host} onChange={(e) => setHost(e.target.value)} placeholder="smtp.gmail.com" />
         </div>
         <div className="field">
           <label>端口</label>

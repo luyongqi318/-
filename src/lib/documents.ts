@@ -2,13 +2,15 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { AlignmentType, Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
+import PptxGenJS from "pptxgenjs";
 import * as XLSX from "xlsx";
 
-export type ArtifactFormat = "docx" | "xlsx" | "csv" | "md" | "txt";
+export type ArtifactFormat = "docx" | "xlsx" | "csv" | "md" | "txt" | "pptx";
 
 export const FORMAT_META: Record<ArtifactFormat, { ext: string; mime: string; label: string }> = {
   docx: { ext: "docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", label: "Word" },
   xlsx: { ext: "xlsx", mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", label: "Excel" },
+  pptx: { ext: "pptx", mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation", label: "PPT" },
   csv: { ext: "csv", mime: "text/csv; charset=utf-8", label: "CSV" },
   md: { ext: "md", mime: "text/markdown; charset=utf-8", label: "Markdown" },
   txt: { ext: "txt", mime: "text/plain; charset=utf-8", label: "文本" },
@@ -97,8 +99,72 @@ function buildXlsx(content: string): Buffer {
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
 }
 
-function buildCsv(content: string): Buffer {
-  const table = parseMarkdownTable(content);
+function stripBullet(line: string): string {
+  return line.replace(/^[-*]\s+/, "").replace(/^\d+[.)]\s+/, "").trim();
+}
+
+async function buildPptx(title: string, content: string): Promise<Buffer> {
+  const pptx = new PptxGenJS();
+  pptx.layout = "LAYOUT_16x9";
+
+  const chunks = content.split(/\n(?=#{1,3}\s)/);
+  const introLines = chunks[0]
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"))
+    .map(stripBullet);
+
+  const cover = pptx.addSlide();
+  cover.background = { color: "0F2130" };
+  cover.addText(title.slice(0, 60), { x: 0.7, y: 1.9, w: 8.6, h: 1.2, fontSize: 34, bold: true, color: "F7F2E7", fontFace: "Microsoft YaHei" });
+  cover.addShape(pptx.ShapeType.rect, { x: 0.75, y: 3.15, w: 1.4, h: 0.06, fill: { color: "C9A869" } });
+  cover.addText(introLines.slice(0, 2).join(" ").slice(0, 120) || "东锦江希尔顿逸林酒店 · 人力资源部", {
+    x: 0.75,
+    y: 3.45,
+    w: 8.2,
+    h: 0.9,
+    fontSize: 15,
+    color: "C9D3DD",
+    fontFace: "Microsoft YaHei",
+  });
+
+  const slides = chunks.slice(1).map((chunk) => {
+    const lines = chunk.split("\n").map((line) => line.trim()).filter(Boolean);
+    const head = lines[0] ?? "";
+    return {
+      title: head.replace(/^#{1,3}\s*/, "").slice(0, 50) || "内容",
+      bullets: lines.slice(1).map(stripBullet).filter(Boolean).slice(0, 8),
+    };
+  });
+
+  if (slides.length === 0) {
+    const all = introLines.filter(Boolean);
+    for (let i = 0; i < all.length; i += 6) {
+      slides.push({ title: i === 0 ? "要点" : `要点（${i / 6 + 1}）`, bullets: all.slice(i, i + 6) });
+    }
+  }
+
+  for (const item of slides.slice(0, 12)) {
+    const slide = pptx.addSlide();
+    slide.background = { color: "FFFDFA" };
+    slide.addText(item.title, { x: 0.7, y: 0.5, w: 8.6, h: 0.8, fontSize: 26, bold: true, color: "1B242C", fontFace: "Microsoft YaHei" });
+    slide.addShape(pptx.ShapeType.rect, { x: 0.75, y: 1.28, w: 1.2, h: 0.05, fill: { color: "C9A869" } });
+    if (item.bullets.length) {
+      slide.addText(
+        item.bullets.map((text) => ({
+          text: text.slice(0, 120),
+          options: { bullet: true, fontSize: 16, color: "3D4F66", breakLine: true, paraSpaceAfter: 8, fontFace: "Microsoft YaHei" },
+        })),
+        { x: 0.9, y: 1.65, w: 8.2, h: 4.6, valign: "top" },
+      );
+    }
+    slide.addText("东锦江希尔顿逸林酒店 · HR", { x: 0.75, y: 6.85, w: 4, h: 0.3, fontSize: 9, color: "9AA6B2" });
+  }
+
+  return (await pptx.write({ outputType: "nodebuffer" })) as Buffer;
+}
+
+function buildCsv(content: string): Buffer {  const table = parseMarkdownTable(content);
   const escape = (v: string) => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   const text = table
     ? table.map((row) => row.map(escape).join(",")).join("\r\n")
@@ -121,6 +187,7 @@ export async function createArtifact(
 
   if (format === "docx") buffer = await buildDocx(name, content);
   else if (format === "xlsx") buffer = buildXlsx(content);
+  else if (format === "pptx") buffer = await buildPptx(name, content);
   else if (format === "csv") buffer = buildCsv(content);
   else if (format === "md") buffer = Buffer.from(`# ${name}\n\n${content}\n`, "utf8");
   else buffer = Buffer.from(`${name}\n\n${content}\n`, "utf8");

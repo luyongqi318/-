@@ -1,6 +1,6 @@
 "use client";
 
-import { FileCode2, FileSpreadsheet, FileText, Loader2, Send, Sparkles } from "lucide-react";
+import { FileCode2, FileSpreadsheet, FileText, Loader2, Presentation, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ChartBlock } from "./ChartBlock";
 
@@ -200,6 +200,9 @@ export function AgentChat({
                   </button>
                   <button className="msg-action" disabled={!!exporting} onClick={() => void exportAs(m, i, "xlsx")}>
                     {exporting === `${i}-xlsx` ? <Loader2 size={12} className="spin" /> : <FileSpreadsheet size={12} />} Excel
+                  </button>
+                  <button className="msg-action" disabled={!!exporting} onClick={() => void exportAs(m, i, "pptx")}>
+                    {exporting === `${i}-pptx` ? <Loader2 size={12} className="spin" /> : <Presentation size={12} />} PPT
                   </button>
                   <button className="msg-action" disabled={!!exporting} onClick={() => void exportAs(m, i, "md")}>
                     {exporting === `${i}-md` ? <Loader2 size={12} className="spin" /> : <FileCode2 size={12} />} Markdown

@@ -1,10 +1,12 @@
 import { Database, HardDriveDownload, KeyRound, ShieldCheck } from "lucide-react";
 import { AgentSettingsForm } from "@/components/AgentSettingsForm";
 import { PasswordForm } from "@/components/PasswordForm";
+import { ResetDataCard } from "@/components/ResetDataCard";
 import { SmtpForm } from "@/components/SmtpForm";
 import { PageHeader } from "@/components/ui";
 import { hasCustomPassword } from "@/lib/auth";
 import { getSmtpConfig } from "@/lib/mailer";
+import { dataCounts } from "@/lib/reset";
 import { getAgentConfig } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +15,7 @@ export default function SettingsPage() {
   const config = getAgentConfig();
   const customPassword = hasCustomPassword();
   const smtp = getSmtpConfig();
+  const counts = dataCounts();
 
   return (
     <>
@@ -46,6 +49,8 @@ export default function SettingsPage() {
               configured: smtp.configured,
             }}
           />
+
+          <ResetDataCard counts={counts} />
 
           <section className="card card-pad">
             <h2 className="card-title" style={{ marginBottom: 12 }}>

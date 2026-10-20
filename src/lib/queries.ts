@@ -292,29 +292,33 @@ export function getPerformance(period?: string) {
   const periods = all<{ period: string }>(
     "SELECT DISTINCT period FROM reviews ORDER BY period DESC",
   ).map((p) => p.period);
-  const selected = period && periods.includes(period) ? period : periods[0];
-  const reviews = all(
-    `SELECT r.*, e.name AS employee, e.position, d.name AS department, d.color AS dept_color
-     FROM reviews r JOIN employees e ON e.id = r.employee_id JOIN departments d ON d.id = e.department_id
-     WHERE r.period = ? ORDER BY r.score DESC`,
-    selected,
-  );
+  const selected = (period && periods.includes(period) ? period : periods[0]) ?? "";
+  const reviews = selected
+    ? all(
+        `SELECT r.*, e.name AS employee, e.position, d.name AS department, d.color AS dept_color
+         FROM reviews r JOIN employees e ON e.id = r.employee_id JOIN departments d ON d.id = e.department_id
+         WHERE r.period = ? ORDER BY r.score DESC`,
+        selected,
+      )
+    : [];
   const dist = ["A", "B", "C", "D"].map((grade) => ({
     grade,
     value: reviews.filter((r: any) => r.grade === grade).length,
   }));
-  const byDept = all(
-    `SELECT d.name AS department,
-       ROUND(AVG(r.score), 1) AS avg,
-       COUNT(*) AS n,
-       SUM(CASE WHEN r.score >= 80 THEN 1 ELSE 0 END) AS pass
-     FROM reviews r
-     JOIN employees e ON e.id = r.employee_id
-     JOIN departments d ON d.id = e.department_id
-     WHERE r.period = ?
-     GROUP BY d.id ORDER BY avg DESC`,
-    selected,
-  );
+  const byDept = selected
+    ? all(
+        `SELECT d.name AS department,
+           ROUND(AVG(r.score), 1) AS avg,
+           COUNT(*) AS n,
+           SUM(CASE WHEN r.score >= 80 THEN 1 ELSE 0 END) AS pass
+         FROM reviews r
+         JOIN employees e ON e.id = r.employee_id
+         JOIN departments d ON d.id = e.department_id
+         WHERE r.period = ?
+         GROUP BY d.id ORDER BY avg DESC`,
+        selected,
+      )
+    : [];
   const avg = reviews.length ? reviews.reduce((s: number, r: any) => s + r.score, 0) / reviews.length : 0;
   const pass = reviews.filter((r: any) => r.score >= 80).length;
   return {
