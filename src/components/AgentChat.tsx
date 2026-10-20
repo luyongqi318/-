@@ -215,7 +215,7 @@ export function AgentChat({
         throw new Error(data.error || "智能体暂时不可用");
       }
       setDemo(!!data.demo);
-      if (data.model) setModel(data.model);
+      if (data.model) setModel(data.model === "deepseek-flash" ? "DeepSeek-V4.1-Flash · Max" : data.model);
       setMessages([...next, { role: "assistant", content: data.reply, tools: data.tools }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "请求失败");

@@ -318,6 +318,8 @@ async function callModel(
         tool_choice: "auto",
         temperature: 0.25,
         max_tokens: 16000,
+        // DeepSeek-V4.1-Flash 支持 low / high / max 三档推理强度
+        reasoning_effort: "max",
       }),
       signal: controller.signal,
     });
