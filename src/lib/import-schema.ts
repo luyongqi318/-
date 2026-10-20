@@ -310,10 +310,15 @@ function importEmployees(db: any, rows: Record<string, string>[], result: Import
     `INSERT INTO employees (emp_no, name, english_name, gender, phone, email, department_id, position, level, hire_date, status, contract_end, salary, birth_date)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
+  let lastDept = "";
+
   rows.forEach((row, index) => {
     const line = index + 2;
     const name = (row["姓名"] ?? "").trim();
-    const dept = resolveDepartment(row);
+    // 花名册常把部门写成合并单元格：当前行没有就沿用上面最近的部门
+    const resolved = resolveDepartment(row);
+    if (resolved) lastDept = resolved;
+    const dept = resolved || lastDept;
     const englishName = (row["e/name"] ?? row["englishname"] ?? row["english name"] ?? "").trim();
 
     // 表格里的空白占位行、只有部门没有姓名的分组行，直接跳过，不算错误

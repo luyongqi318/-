@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "请先登录" }, { status: 401 });
 
-  let body: { apiKey?: string; baseUrl?: string; model?: string; clearKey?: boolean };
+  let body: { apiKey?: string; baseUrl?: string; model?: string; clearKey?: boolean; writeEnabled?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -40,6 +40,10 @@ export async function POST(req: Request) {
     const model = body.model.trim();
     if (model.length > 80) return NextResponse.json({ error: "模型名称过长" }, { status: 400 });
     setSetting("agent_model", model);
+  }
+
+  if (typeof body.writeEnabled === "boolean") {
+    setSetting("agent_write_enabled", body.writeEnabled ? "1" : "0");
   }
 
   if (body.clearKey) {

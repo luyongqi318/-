@@ -36,6 +36,11 @@ export function maskKey(key: string): string {
 }
 
 /** 数据库里的配置优先，其次环境变量；页面保存后立即生效，无需重启。 */
+/** 是否允许智能体直接改数据（最高权限）。默认关闭。 */
+export function isAgentWriteEnabled(): boolean {
+  return getSetting("agent_write_enabled") === "1";
+}
+
 export function getAgentConfig(): AgentConfig {
   const dbKey = getSetting("agent_api_key");
   const envKey = (process.env.DEEPSEEK_API_KEY || process.env.AGENT_API_KEY || "").trim();

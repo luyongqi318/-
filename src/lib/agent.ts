@@ -8,7 +8,9 @@ import {
   getScheduling,
   getTraining,
 } from "./queries";
-import { getAgentConfig } from "./settings";
+import { logAudit } from "./audit";
+import { getDb } from "./db";
+import { getAgentConfig, isAgentWriteEnabled } from "./settings";
 import { findKnowledge, knowledgePrompt } from "./knowledge";
 
 const MAX_HISTORY_MESSAGES = 400;
@@ -49,9 +51,51 @@ type 只支持 bar / pie；data 最多 10 项；数字必须来自工具查询�
 /** 系统提示 = 基础规则 + 用户投喂的制度资料（优先生效）。 */
 function buildSystemPrompt(): string {
   const kb = knowledgePrompt(10, 20000);
-  if (!kb) return SYSTEM_PROMPT;
-  return `${SYSTEM_PROMPT}\n\n【酒店内部资料（用户投喂，回答制度与流程问题时优先引用）】\n${kb}`;
+  const writeRule = isAgentWriteEnabled()
+    ? "\n\n【写权限】你已被授予最高权限：可以调用 update_employee_department、update_employee_field 直接修改员工资料。修改前先用 search_employees 确认是同一人；一次只改用户明确指定的对象，改完回报改了什么。"
+    : "\n\n【写权限】当前只读：不要声称自己能修改数据，需要变更时告诉用户在系统里操作，或请管理员开启「允许智能体修改数据」。";
+  const base = `${SYSTEM_PROMPT}${writeRule}`;
+  if (!kb) return base;
+  return `${base}\n\n【酒店内部资料（用户投喂，回答制度与流程问题时优先引用）】\n${kb}`;
 }
+
+const WRITE_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "update_employee_department",
+      description:
+        "修改员工所属部门（写库）。员工可用姓名或工号指定；部门不存在会自动创建。仅当用户明确要求调整部门时使用。",
+      parameters: {
+        type: "object",
+        properties: {
+          employee: { type: "string", description: "员工姓名或工号" },
+          department: { type: "string", description: "目标部门名称，如 餐饮部" },
+        },
+        required: ["employee", "department"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_employee_field",
+      description:
+        "修改单个员工的字段（写库）。field 仅支持 position / phone / status / english_name / level。仅当用户明确要求修改时使用。",
+      parameters: {
+        type: "object",
+        properties: {
+          employee: { type: "string", description: "员工姓名或工号" },
+          field: { type: "string", enum: ["position", "phone", "status", "english_name", "level"] },
+          value: { type: "string", description: "新值" },
+        },
+        required: ["employee", "field", "value"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
 
 const TOOLS = [
   {
@@ -144,6 +188,40 @@ type ToolCall = { tool: string; ok: boolean };
 
 function runTool(name: string, args: Record<string, any>): { data: any; ok: boolean } {
   try {
+    if (name === "update_employee_department" || name === "update_employee_field") {
+      if (!isAgentWriteEnabled()) {
+        return { data: { error: "写权限未开启，请管理员在系统设置里开启「允许智能体修改数据」" }, ok: false };
+      }
+      const db = getDb();
+      const key = String(args.employee ?? "").trim();
+      const employee = db
+        .prepare("SELECT id, name, emp_no, department_id FROM employees WHERE emp_no = ? OR name = ? LIMIT 1")
+        .get(key, key) as { id: number; name: string; emp_no: string; department_id: number } | undefined;
+      if (!employee) return { data: { error: `没有找到员工：${key}` }, ok: false };
+
+      if (name === "update_employee_department") {
+        const deptName = String(args.department ?? "").trim();
+        if (!deptName) return { data: { error: "缺少部门名称" }, ok: false };
+        let dept = db.prepare("SELECT id FROM departments WHERE name = ?").get(deptName) as { id: number } | undefined;
+        if (!dept) {
+          const info = db.prepare("INSERT INTO departments (name, color) VALUES (?, ?)").run(deptName, "#8a6a3a");
+          dept = { id: Number(info.lastInsertRowid) };
+        }
+        db.prepare("UPDATE employees SET department_id = ? WHERE id = ?").run(dept.id, employee.id);
+        logAudit("智能体改部门", `${employee.name}（${employee.emp_no}）→ ${deptName}`, "AI 智能体", "-");
+        return { data: { ok: true, employee: employee.name, department: deptName }, ok: true };
+      }
+
+      const field = String(args.field ?? "");
+      const value = String(args.value ?? "").trim();
+      if (!["position", "phone", "status", "english_name", "level"].includes(field) || !value) {
+        return { data: { error: "字段或值不合法" }, ok: false };
+      }
+      db.prepare(`UPDATE employees SET ${field} = ? WHERE id = ?`).run(value, employee.id);
+      logAudit("智能体改资料", `${employee.name} 的 ${field} → ${value}`, "AI 智能体", "-");
+      return { data: { ok: true, employee: employee.name, field, value }, ok: true };
+    }
+
     switch (name) {
       case "get_hr_overview": {
         const d = getDashboard();
@@ -314,7 +392,7 @@ async function callModel(
       body: JSON.stringify({
         model,
         messages: toApiMessages(messages),
-        tools: TOOLS,
+        tools: isAgentWriteEnabled() ? [...TOOLS, ...WRITE_TOOLS] : TOOLS,
         tool_choice: "auto",
         temperature: 0.25,
         max_tokens: 16000,
