@@ -259,17 +259,70 @@ function nextEmpNo(db: any): string {
 /* 各实体的导入实现                                                     */
 /* ------------------------------------------------------------------ */
 
+/** 花名册里常见的英文部门代码 → 中文部门名（Dept. 列为分组代码时使用） */
+const DEPT_BY_CODE: Record<string, string> = {
+  EO: "行政人事部",
+  HR: "行政人事部",
+  "S&M": "市场销售部",
+  FIN: "财务部",
+  ENG: "保障部",
+  "ENG Budget": "保障部",
+  "Property Department": "保障部",
+  "F&B Office": "餐饮部",
+  "Grand Cafe": "餐饮部",
+  "Room Service": "餐饮部",
+  "Lobby Lounge": "餐饮部",
+  Banquet: "餐饮部",
+  WK: "餐饮部",
+  Pastry: "餐饮部",
+  "CK Office": "餐饮部",
+  "Processing Center": "餐饮部",
+  "Cold Dish": "餐饮部",
+  "Dim Sum": "餐饮部",
+  "SH Kitchen": "餐饮部",
+  Reservation: "房务部",
+  "FO Budget": "房务部",
+  Hhonors: "房务部",
+  Operator: "房务部",
+  Reception: "房务部",
+  Concierge: "房务部",
+  Transportation: "房务部",
+  "Executive Floor": "房务部",
+  "HSK Office": "房务部",
+  PA: "房务部",
+  Floor: "房务部",
+  Laundry: "房务部",
+  Linen: "房务部",
+  "Fitness Center": "房务部",
+  "房务部（物业）": "房务部（物业）",
+};
+
+function resolveDepartment(row: Record<string, string>): string {
+  const direct = (row["部门"] ?? "").trim();
+  if (direct) return direct;
+  const code = (row["dept"] ?? row["dept."] ?? "").trim();
+  if (!code) return "";
+  return DEPT_BY_CODE[code] ?? DEPT_BY_CODE[code.replace(/\.$/, "")] ?? "";
+}
+
 function importEmployees(db: any, rows: Record<string, string>[], result: ImportResult) {
   const insert = db.prepare(
-    `INSERT INTO employees (emp_no, name, gender, phone, email, department_id, position, level, hire_date, status, contract_end, salary, birth_date)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO employees (emp_no, name, english_name, gender, phone, email, department_id, position, level, hire_date, status, contract_end, salary, birth_date)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   rows.forEach((row, index) => {
     const line = index + 2;
     const name = (row["姓名"] ?? "").trim();
-    const dept = (row["部门"] ?? "").trim();
-    if (!name || !dept) {
-      result.errors.push({ line, message: "姓名和部门必填" });
+    const dept = resolveDepartment(row);
+    const englishName = (row["e/name"] ?? row["englishname"] ?? row["english name"] ?? "").trim();
+
+    // 表格里的空白占位行、只有部门没有姓名的分组行，直接跳过，不算错误
+    if (!name) {
+      result.skipped += 1;
+      return;
+    }
+    if (!dept) {
+      result.errors.push({ line, message: "缺部门" });
       return;
     }
     const hireDate = normalizeDate(row["入职日期"] ?? "");
@@ -289,6 +342,7 @@ function importEmployees(db: any, rows: Record<string, string>[], result: Import
     insert.run(
       empNo,
       name,
+      englishName || null,
       (row["性别"] ?? "").trim() || "女",
       (row["手机号"] ?? "").trim(),
       (row["邮箱"] ?? "").trim(),
@@ -661,6 +715,10 @@ export function remapRows(rows: Record<string, string>[], mapping: Record<string
     const out: Record<string, string> = {};
     for (const [canonical, source] of Object.entries(mapping)) {
       out[canonical] = row[source] ?? "";
+    }
+    // 未被映射的原始列也带上，便于导入时读取英文名等附加字段
+    for (const [key, value] of Object.entries(row)) {
+      if (!(key in out)) out[key] = value;
     }
     return out;
   });

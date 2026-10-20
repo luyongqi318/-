@@ -328,6 +328,15 @@ function migrate(db: DB): void {
     version = 6;
   }
 
+  if (version < 7) {
+    try {
+      db.exec("ALTER TABLE employees ADD COLUMN english_name TEXT");
+    } catch {
+      /* 列已存在 */
+    }
+    version = 7;
+  }
+
   if (version !== current) {
     db.exec(`PRAGMA user_version = ${version}`);
   }

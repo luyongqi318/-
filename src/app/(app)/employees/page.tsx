@@ -119,7 +119,7 @@ export default async function EmployeesPage({
                       <Avatar name={e.name} color={e.dept_color} />
                       <div>
                         <div className="cell-main">{e.name}</div>
-                        <div className="cell-sub num">{e.emp_no}</div>
+                        <div className="cell-sub num">{(e as any).english_name ? `${(e as any).english_name} · ` : ""}{e.emp_no}</div>
                       </div>
                     </div>
                   </td>
