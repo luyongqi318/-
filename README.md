@@ -40,6 +40,18 @@ npm run build
 npm start
 ```
 
+### 长期在本机运行（推荐）
+
+```powershell
+pwsh -File local\start.ps1      # 后台启动，打印地址，自动开浏览器
+pwsh -File local\stop.ps1       # 停止
+pwsh -File local\install-autostart.ps1   # 开机自启（取消：uninstall-autostart.ps1）
+```
+
+- 服务从 `release/app` 运行：重新构建时线上不中断，切换只需 `npm run release` 后重启
+- 数据库固定在 `data/hr.db`，日志在 `data/logs`（需要写日志时设 `HR_LOG_TO_FILE=1`）
+- 清空演示数据：系统设置 → 清空业务数据（自动备份到 `data/backup-before-reset-*.db`）
+
 演示账号：`hr` / `doubletree2026`（可用 `HR_USER`、`HR_PASS` 覆盖）
 
 首次启动会在 `data/hr.db` 自动建表并写入演示数据；删除 `data/` 目录后重启即可重置。
