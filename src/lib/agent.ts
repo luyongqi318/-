@@ -11,7 +11,11 @@ import {
 import { logAudit } from "./audit";
 import { getDb } from "./db";
 import { getAgentConfig, isAgentWriteEnabled } from "./settings";
-import { findKnowledge, knowledgePrompt } from "./knowledge";
+import { findKnowledge, knowledgePrompt, listKnowledge } from "./knowledge";
+import { listApprovals } from "./approvals";
+import { listAgency, listCertificates, listDorms } from "./admin";
+import { listAudit } from "./audit";
+import { listMessages } from "./mailer";
 
 const MAX_HISTORY_MESSAGES = 400;
 const MAX_MESSAGE_CHARS = 20000;
@@ -162,14 +166,60 @@ const TOOLS = [
     type: "function",
     function: {
       name: "search_employees",
-      description: "按姓名、工号、职位或部门关键字检索员工，返回部门、职位、入职日期、状态、合同到期日。",
+      description:
+        "检索员工明细（姓名/工号/职位/英文名关键字，可按部门、在职状态、入职日期区间筛选），返回姓名、工号、英文名、部门、职位、入职、状态、合同到期、电话。这是查「本月入职是谁」「某部门有哪些人」的首选工具。",
       parameters: {
         type: "object",
         properties: {
-          keyword: { type: "string" },
-          limit: { type: "integer", minimum: 1, maximum: 20 },
+          keyword: { type: "string", description: "关键字，可留空" },
+          department: { type: "string", description: "部门全名，如 餐饮部" },
+          status: { type: "string", description: "在职 / 试用期 / 离职" },
+          position: { type: "string", description: "职位关键字" },
+          hireFrom: { type: "string", description: "入职日期下限 YYYY-MM-DD" },
+          hireTo: { type: "string", description: "入职日期上限 YYYY-MM-DD" },
+          limit: { type: "integer", minimum: 1, maximum: 200 },
         },
-        required: ["keyword"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_data",
+      description:
+        "读取网站任意模块的数据。dataset 可选：employees / departments / jobs / candidates / training / performance / attendance / approvals / certificates / dorms / agency / messages / audit / knowledge。可按 keyword、status、department、from、to、days、limit 过滤。需要具体名单或明细时用它。",
+      parameters: {
+        type: "object",
+        properties: {
+          dataset: {
+            type: "string",
+            enum: [
+              "employees",
+              "departments",
+              "jobs",
+              "candidates",
+              "training",
+              "performance",
+              "attendance",
+              "approvals",
+              "certificates",
+              "dorms",
+              "agency",
+              "messages",
+              "audit",
+              "knowledge",
+            ],
+          },
+          keyword: { type: "string" },
+          status: { type: "string" },
+          department: { type: "string" },
+          from: { type: "string", description: "起始日期 YYYY-MM-DD" },
+          to: { type: "string", description: "结束日期 YYYY-MM-DD" },
+          days: { type: "integer", description: "证照到期天数范围，如 30" },
+          limit: { type: "integer", minimum: 1, maximum: 300 },
+        },
+        required: ["dataset"],
         additionalProperties: false,
       },
     },
@@ -313,22 +363,128 @@ function runTool(name: string, args: Record<string, any>): { data: any; ok: bool
         };
       }
       case "search_employees": {
-        const kw = String(args.keyword || "").trim();
-        const rows = kw
-          ? getEmployees({ q: kw }).slice(0, Math.min(Number(args.limit) || 8, 20))
-          : [];
+        const db = getDb();
+        const where: string[] = [];
+        const params: any[] = [];
+        const kw = String(args.keyword || args.q || "").trim();
+        if (kw) {
+          where.push("(e.name LIKE ? OR e.emp_no LIKE ? OR e.position LIKE ? OR IFNULL(e.english_name,'') LIKE ?)");
+          params.push(`%${kw}%`, `%${kw}%`, `%${kw}%`, `%${kw}%`);
+        }
+        if (args.department) {
+          where.push("d.name = ?");
+          params.push(String(args.department));
+        }
+        if (args.status) {
+          where.push("e.status = ?");
+          params.push(String(args.status));
+        }
+        if (args.position) {
+          where.push("e.position LIKE ?");
+          params.push(`%${args.position}%`);
+        }
+        if (args.hireFrom) {
+          where.push("e.hire_date >= ?");
+          params.push(String(args.hireFrom));
+        }
+        if (args.hireTo) {
+          where.push("e.hire_date <= ?");
+          params.push(String(args.hireTo));
+        }
+        const limit = Math.min(Number(args.limit) || 20, 200);
+        const rows = db
+          .prepare(
+            `SELECT e.name, e.emp_no, d.name AS department, e.position, e.english_name, e.hire_date, e.status,
+                    e.contract_end, e.phone, e.gender
+             FROM employees e LEFT JOIN departments d ON d.id = e.department_id
+             ${where.length ? "WHERE " + where.join(" AND ") : ""}
+             ORDER BY e.hire_date DESC, e.id DESC LIMIT ?`,
+          )
+          .all(...params, limit) as any[];
         return {
           data: rows.map((e) => ({
             姓名: e.name,
             工号: e.emp_no,
-            部门: e.department,
+            英文名: e.english_name || "",
+            部门: e.department || "",
             职位: e.position,
+            性别: e.gender,
             入职: e.hire_date,
             状态: e.status,
-            合同到期: e.contract_end,
+            合同到期: e.contract_end || "",
+            电话: e.phone || "",
           })),
           ok: true,
         };
+      }
+      case "read_data": {
+        const dataset = String(args.dataset || "");
+        const limit = Math.min(Number(args.limit) || 50, 300);
+        const keyword = String(args.keyword || "").trim();
+        const status = String(args.status || "").trim();
+        const db = getDb();
+
+        if (dataset === "employees") {
+          return runTool("search_employees", { keyword, status, department: args.department, hireFrom: args.from, hireTo: args.to, limit });
+        }
+        if (dataset === "jobs") {
+          return {
+            data: getJobs()
+              .filter((j) => !status || j.status === status)
+              .filter((j) => !keyword || j.title.includes(keyword))
+              .slice(0, limit),
+            ok: true,
+          };
+        }
+        if (dataset === "candidates") {
+          return {
+            data: getCandidates()
+              .filter((c) => !status || c.stage === status)
+              .filter((c) => !keyword || c.name.includes(keyword) || String(c.job).includes(keyword))
+              .slice(0, limit),
+            ok: true,
+          };
+        }
+        if (dataset === "training") {
+          const t = getTraining();
+          return { data: { 概况: t.stats, 课程: t.courses, 逾期: (t.enrollments as any[]).filter((e) => e.status === "已逾期").slice(0, limit) }, ok: true };
+        }
+        if (dataset === "performance") {
+          const p = getPerformance();
+          return { data: { 周期: p.periods, 汇总: p.stats, 部门: p.byDept }, ok: true };
+        }
+        if (dataset === "attendance") {
+          const s = getScheduling();
+          return { data: { 排班: s.attStats, 今日打卡: (s.attendanceToday as any[]).slice(0, limit) }, ok: true };
+        }
+        if (dataset === "approvals") {
+          const rows = listApprovals(status || undefined);
+          return { data: rows.slice(0, limit), ok: true };
+        }
+        if (dataset === "certificates") {
+          const days = Number(args.days) || 3650;
+          return { data: listCertificates().filter((c) => c.daysLeft <= days).slice(0, limit), ok: true };
+        }
+        if (dataset === "dorms") {
+          return { data: listDorms().slice(0, limit), ok: true };
+        }
+        if (dataset === "agency") {
+          const rows = listAgency().filter((w) => !status || w.status === status);
+          return { data: rows.slice(0, limit), ok: true };
+        }
+        if (dataset === "messages") {
+          return { data: listMessages(limit as any), ok: true };
+        }
+        if (dataset === "audit") {
+          return { data: listAudit(limit as any).slice(0, limit), ok: true };
+        }
+        if (dataset === "knowledge") {
+          return { data: listKnowledge().slice(0, limit), ok: true };
+        }
+        if (dataset === "departments") {
+          return { data: db.prepare("SELECT d.name, COUNT(e.id) AS 人数 FROM departments d LEFT JOIN employees e ON e.department_id = d.id GROUP BY d.id ORDER BY 人数 DESC").all(), ok: true };
+        }
+        return { data: { error: `不支持的数据集：${dataset}` }, ok: false };
       }
       case "get_department_headcount": {
         const d = getDashboard();
