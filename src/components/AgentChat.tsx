@@ -1,6 +1,6 @@
 "use client";
 
-import { FileCode2, FileSpreadsheet, FileText, Loader2, Presentation, Send, Sparkles } from "lucide-react";
+import { FileCode2, FileSpreadsheet, FileText, Loader2, Paperclip, Presentation, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ChartBlock } from "./ChartBlock";
 
@@ -12,9 +12,21 @@ type Msg = {
 
 /** 轻量 Markdown：只处理标题、列表与 **加粗**，避免引入额外依赖。 */
 function renderInline(text: string, key: number) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    part.startsWith("**") && part.endsWith("**") ? <strong key={`${key}-${i}`}>{part.slice(2, -2)}</strong> : <span key={`${key}-${i}`}>{part}</span>,
-  );
+  return text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g).map((part, i) => {
+    const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (link) {
+      return (
+        <a key={`${key}-${i}`} href={link[2]} style={{ color: "#0071e3", textDecoration: "underline" }}>
+          {link[1]}
+        </a>
+      );
+    }
+    return part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={`${key}-${i}`}>{part.slice(2, -2)}</strong>
+    ) : (
+      <span key={`${key}-${i}`}>{part}</span>
+    );
+  });
 }
 
 function renderLines(content: string) {
@@ -87,6 +99,8 @@ export function AgentChat({
   initialMessages?: { role: "user" | "assistant"; content: string }[];
 }) {
   const [messages, setMessages] = useState<Msg[]>(initialMessages.map((m) => ({ role: m.role, content: m.content })));
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -98,6 +112,59 @@ export function AgentChat({
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
+
+  /** 在对话里直接上传文件：表格更新数据库，文本进知识库 */
+  async function importFile(file: File) {
+    setUploading(true);
+    setError("");
+    setMessages((prev) => [...prev, { role: "user", content: `📎 上传文件：${file.name}` }]);
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      if (["txt", "md"].includes(ext)) {
+        const text = await file.text();
+        const res = await fetch("/api/knowledge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: file.name.replace(/\.[^.]+$/, ""), content: text }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "存入知识库失败");
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `📚 已存入知识库：**${file.name}**（${text.length} 字）。之后问制度、流程类问题时我会引用它。` },
+        ]);
+        return;
+      }
+
+      if (!["xlsx", "xls", "csv"].includes(ext)) {
+        throw new Error("目前支持 Excel / CSV / TXT / Markdown；Word、PDF 请先另存为表格或文本");
+      }
+
+      const form = new FormData();
+      form.append("entity", "auto");
+      form.append("mode", "replace");
+      form.append("file", file);
+      const res = await fetch("/api/import", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "导入失败");
+
+      const lines = [
+        `✅ 已导入 **${data.label}**`,
+        `新增 ${data.inserted} 条 · 跳过 ${data.skipped ?? 0} 条${data.replaced ? ` · 替换旧数据 ${data.replaced} 条` : ""}${data.errors?.length ? ` · 错误 ${data.errors.length} 条` : ""}`,
+      ];
+      if (data.notes?.length) lines.push(data.notes.join("；"));
+      if (data.errors?.length) {
+        lines.push("有问题的行：");
+        for (const err of data.errors.slice(0, 5)) lines.push(`- 第 ${err.line} 行：${err.message}`);
+        if (data.batchId) lines.push(`\n[下载完整错误明细](/api/import/batches/${data.batchId}/errors)`);
+      }
+      setMessages((prev) => [...prev, { role: "assistant", content: lines.join("\n") }]);
+    } catch (err) {
+      setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err instanceof Error ? err.message : "上传失败"}` }]);
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function send(text?: string) {
     const question = (text ?? input).trim();
@@ -247,6 +314,20 @@ export function AgentChat({
             placeholder="问问招聘、培训、排班或绩效…（Enter 发送，Shift+Enter 换行）"
             rows={1}
           />
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls,.csv,.txt,.md"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void importFile(file);
+              e.target.value = "";
+            }}
+          />
+          <button className="attach-btn" onClick={() => fileRef.current?.click()} disabled={loading} aria-label="上传文件更新数据库">
+            {uploading ? <Loader2 size={17} className="spin" /> : <Paperclip size={17} />}
+          </button>
           <button className="send-btn" onClick={() => void send()} disabled={loading || !input.trim()} aria-label="发送">
             <Send size={17} />
           </button>

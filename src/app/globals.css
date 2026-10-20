@@ -2826,6 +2826,30 @@ body {
   gap: 1px;
 }
 
+.attach-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  color: #6e6e73;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.attach-btn:hover:not(:disabled) {
+  color: #0071e3;
+  border-color: #0071e3;
+  background: #f5f9ff;
+}
+
+.attach-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* =========================================================================
    Theme v4 · 苹果式留白与精度（保留酒店的酒红/香槟金作为点缀）
    ========================================================================= */
