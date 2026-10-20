@@ -11,9 +11,9 @@ import {
 import { getAgentConfig } from "./settings";
 import { findKnowledge, knowledgePrompt } from "./knowledge";
 
-const MAX_HISTORY_MESSAGES = 200;
-const MAX_MESSAGE_CHARS = 8000;
-const MAX_CONTEXT_CHARS = 24000;
+const MAX_HISTORY_MESSAGES = 400;
+const MAX_MESSAGE_CHARS = 20000;
+const MAX_CONTEXT_CHARS = 200000;
 
 const SYSTEM_PROMPT = `你是「上海东锦江希尔顿逸林酒店」的人力资源智能助手，服务对象是酒店 HR 与部门负责人。
 
@@ -272,7 +272,29 @@ function runTool(name: string, args: Record<string, any>): { data: any; ok: bool
   }
 }
 
-type ChatMessage = { role: "system" | "user" | "assistant" | "tool"; content: string; tool_calls?: any; tool_call_id?: string };
+type Attachment = { type: "image"; dataUrl: string };
+
+type ChatMessage = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+  attachments?: Attachment[];
+  tool_calls?: any;
+  tool_call_id?: string;
+};
+
+/** 带图片的消息转成 OpenAI 多模态格式（deepseek-flash 支持 text + image 输入）。 */
+function toApiMessages(messages: ChatMessage[]) {
+  return messages.map((message) => {
+    if (!message.attachments?.length) return { ...message, content: message.content };
+    return {
+      ...message,
+      content: [
+        { type: "text", text: message.content || "请看这张图片" },
+        ...message.attachments.map((attachment) => ({ type: "image_url", image_url: { url: attachment.dataUrl } })),
+      ],
+    };
+  });
+}
 
 async function callModel(
   messages: ChatMessage[],
@@ -291,11 +313,11 @@ async function callModel(
       },
       body: JSON.stringify({
         model,
-        messages,
+        messages: toApiMessages(messages),
         tools: TOOLS,
         tool_choice: "auto",
         temperature: 0.25,
-        max_tokens: 8000,
+        max_tokens: 16000,
       }),
       signal: controller.signal,
     });
@@ -310,16 +332,20 @@ async function callModel(
 }
 
 export async function askAgent(
-  history: { role: "user" | "assistant"; content: string }[],
+  history: { role: "user" | "assistant"; content: string; attachments?: Attachment[] }[],
 ): Promise<{ reply: string; tools: ToolCall[]; model: string; demo: boolean }> {
   const config = getAgentConfig();
   const clean = history
     .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
     .slice(-MAX_HISTORY_MESSAGES)
-    .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_MESSAGE_CHARS) }));
+    .map((m) => ({
+      role: m.role,
+      content: m.content.slice(0, MAX_MESSAGE_CHARS),
+      attachments: m.role === "user" ? m.attachments : undefined,
+    }));
 
   // 按字符预算保留尽量多的上下文（从最新往前取，避免超长对话把请求撑爆）
-  const budgeted: { role: "user" | "assistant"; content: string }[] = [];
+  const budgeted: { role: "user" | "assistant"; content: string; attachments?: Attachment[] }[] = [];
   let usedChars = 0;
   for (let i = clean.length - 1; i >= 0; i -= 1) {
     const item = clean[i];

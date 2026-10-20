@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "提问太频繁了，请休息一分钟再试" }, { status: 429 });
   }
 
-  let body: { messages?: { role: "user" | "assistant"; content: string }[] };
+  let body: { messages?: { role: "user" | "assistant"; content: string; attachments?: { type: "image"; dataUrl: string }[] }[] };
   try {
     body = await req.json();
   } catch {

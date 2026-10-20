@@ -2850,6 +2850,56 @@ body {
   cursor: not-allowed;
 }
 
+.attach-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  background: #fbfbfd;
+  font-size: 12px;
+  color: #424245;
+}
+
+.attach-chip img {
+  width: 34px;
+  height: 34px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.attach-doc {
+  font-size: 20px;
+}
+
+.attach-name {
+  font-weight: 600;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach-hint {
+  color: #86868b;
+}
+
+.attach-remove {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  color: #86868b;
+  cursor: pointer;
+}
+
+.attach-remove:hover {
+  color: #b3261e;
+}
+
 /* =========================================================================
    Theme v4 · 苹果式留白与精度（保留酒店的酒红/香槟金作为点缀）
    ========================================================================= */

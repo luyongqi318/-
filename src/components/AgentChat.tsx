@@ -8,6 +8,7 @@ type Msg = {
   role: "user" | "assistant";
   content: string;
   tools?: { tool: string; ok: boolean }[];
+  attachments?: { type: "image"; dataUrl: string }[];
 };
 
 /** 轻量 Markdown：只处理标题、列表与 **加粗**，避免引入额外依赖。 */
@@ -107,71 +108,92 @@ export function AgentChat({
   const [demo, setDemo] = useState(!configured);
   const [model, setModel] = useState(configured ? "DeepSeek" : "本地演示模式");
   const [exporting, setExporting] = useState("");
+  const [pending, setPending] = useState<{ file: File; preview: string } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
-  /** 在对话里直接上传文件：表格更新数据库，文本进知识库 */
-  async function importFile(file: File) {
-    setUploading(true);
-    setError("");
-    setMessages((prev) => [...prev, { role: "user", content: `📎 上传文件：${file.name}` }]);
-    try {
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      if (["txt", "md"].includes(ext)) {
-        const text = await file.text();
-        const res = await fetch("/api/knowledge", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: file.name.replace(/\.[^.]+$/, ""), content: text }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "存入知识库失败");
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `📚 已存入知识库：**${file.name}**（${text.length} 字）。之后问制度、流程类问题时我会引用它。` },
-        ]);
-        return;
-      }
+  /** 选中文件先暂存，等用户补充提示词后一起发送 */
+  function stageFile(file: File) {
+    setPending({ file, preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : "" });
+  }
 
-      if (!["xlsx", "xls", "csv"].includes(ext)) {
-        throw new Error("目前支持 Excel / CSV / TXT / Markdown；Word、PDF 请先另存为表格或文本");
-      }
-
-      const form = new FormData();
-      form.append("entity", "auto");
-      form.append("mode", "replace");
-      form.append("file", file);
-      const res = await fetch("/api/import", { method: "POST", body: form });
+  /** 表格 → 覆盖导入；文本 → 知识库。返回给模型看的说明。 */
+  async function ingestFile(file: File): Promise<string> {
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (["txt", "md"].includes(ext)) {
+      const text = await file.text();
+      const res = await fetch("/api/knowledge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: file.name.replace(/\.[^.]+$/, ""), content: text }),
+      });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "导入失败");
-
-      const lines = [
-        `✅ 已导入 **${data.label}**`,
-        `新增 ${data.inserted} 条 · 跳过 ${data.skipped ?? 0} 条${data.replaced ? ` · 替换旧数据 ${data.replaced} 条` : ""}${data.errors?.length ? ` · 错误 ${data.errors.length} 条` : ""}`,
-      ];
-      if (data.notes?.length) lines.push(data.notes.join("；"));
-      if (data.errors?.length) {
-        lines.push("有问题的行：");
-        for (const err of data.errors.slice(0, 5)) lines.push(`- 第 ${err.line} 行：${err.message}`);
-        if (data.batchId) lines.push(`\n[下载完整错误明细](/api/import/batches/${data.batchId}/errors)`);
-      }
-      setMessages((prev) => [...prev, { role: "assistant", content: lines.join("\n") }]);
-    } catch (err) {
-      setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err instanceof Error ? err.message : "上传失败"}` }]);
-    } finally {
-      setUploading(false);
+      if (!res.ok) throw new Error(data.error || "存入知识库失败");
+      return `[已把文件《${file.name}》存入知识库，共 ${text.length} 字]`;
     }
+
+    if (!["xlsx", "xls", "csv"].includes(ext)) {
+      throw new Error("支持 Excel / CSV / TXT / Markdown / 图片；Word、PDF 请先另存");
+    }
+
+    const form = new FormData();
+    form.append("entity", "auto");
+    form.append("mode", "replace");
+    form.append("file", file);
+    const res = await fetch("/api/import", { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "导入失败");
+
+    const parts = [
+      `[已上传并导入文件《${file.name}》：识别为${data.label}，新增 ${data.inserted} 条，替换旧数据 ${data.replaced ?? 0} 条，错误 ${data.errors?.length ?? 0} 条]`,
+    ];
+    if (data.errors?.length) {
+      parts.push(`其中有问题的行：${data.errors.slice(0, 5).map((e: any) => `第 ${e.line} 行 ${e.message}`).join("；")}`);
+    }
+    return parts.join("\n");
+  }
+
+  function readAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("图片读取失败"));
+      reader.readAsDataURL(file);
+    });
   }
 
   async function send(text?: string) {
     const question = (text ?? input).trim();
-    if (!question || loading) return;
+    if ((!question && !pending) || loading) return;
+
+    let content = question;
+    let attachments: { type: "image"; dataUrl: string }[] | undefined;
+    if (pending) {
+      setUploading(true);
+      try {
+        if (pending.file.type.startsWith("image/")) {
+          attachments = [{ type: "image", dataUrl: await readAsDataUrl(pending.file) }];
+          if (!content) content = "请描述这张图片，并结合酒店 HR 场景给出可以落地的建议";
+        } else {
+          const note = await ingestFile(pending.file);
+          content = `${note}\n\n${question}`;
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "上传失败");
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+      setPending(null);
+    }
+    if (!content) content = "请描述这张图片";
+
     setInput("");
     setError("");
-    const next: Msg[] = [...messages, { role: "user", content: question }];
+    const next: Msg[] = [...messages, { role: "user", content, attachments }];
     setMessages(next);
     setLoading(true);
     try {
@@ -179,7 +201,7 @@ export function AgentChat({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: next.slice(-200).map((m) => ({ role: m.role, content: m.content })),
+          messages: next.slice(-200).map((m) => ({ role: m.role, content: m.content, attachments: m.attachments })),
         }),
       });
       const data = (await res.json()) as {
@@ -251,6 +273,13 @@ export function AgentChat({
             <div className="msg-avatar">{m.role === "user" ? "我" : "AI"}</div>
             <div>
               <div className="msg-bubble">
+                {m.attachments?.length ? (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: m.content ? 8 : 0 }}>
+                    {m.attachments.map((a, k) => (
+                      <img key={k} src={a.dataUrl} alt="附件图片" style={{ maxWidth: 220, borderRadius: 10, display: "block" }} />
+                    ))}
+                  </div>
+                ) : null}
                 <MessageBody content={m.content} />
               </div>
               {m.tools && m.tools.length > 0 ? (
@@ -300,6 +329,16 @@ export function AgentChat({
       </div>
 
       <div className="agent-foot">
+        {pending ? (
+          <div className="attach-chip">
+            {pending.preview ? <img src={pending.preview} alt="预览" /> : <span className="attach-doc">📄</span>}
+            <span className="attach-name">{pending.file.name}</span>
+            <span className="attach-hint">补充一句要我怎么处理，然后发送</span>
+            <button className="attach-remove" onClick={() => setPending(null)} aria-label="移除附件">
+              ×
+            </button>
+          </div>
+        ) : null}
         {error ? <div className="form-error">{error}</div> : null}
         <div className="agent-input-row">
           <textarea
@@ -317,11 +356,11 @@ export function AgentChat({
           <input
             ref={fileRef}
             type="file"
-            accept=".xlsx,.xls,.csv,.txt,.md"
+            accept=".xlsx,.xls,.csv,.txt,.md,.png,.jpg,.jpeg,.webp,.gif"
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) void importFile(file);
+              if (file) stageFile(file);
               e.target.value = "";
             }}
           />
