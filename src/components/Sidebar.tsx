@@ -6,6 +6,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   Mail,
+  Network,
   ScrollText,
   Settings,
   Sparkles,
@@ -32,6 +33,7 @@ export function Sidebar({ interviewBadge }: { interviewBadge?: number }) {
         <NavLink href="/recruitment" label="招聘管理" icon={<Briefcase />} badge={interviewBadge} />
         <NavLink href="/training" label="培训与入职" icon={<GraduationCap />} />
         <NavLink href="/employees" label="员工档案" icon={<Users />} />
+        <NavLink href="/org" label="组织架构" icon={<Network />} />
         <NavLink href="/data" label="数据投喂" icon={<Upload />} />
       </nav>
 

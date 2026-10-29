@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { BarChart3, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { HotelBackdrop } from "@/components/HotelBackdrop";
 import { LoginForm } from "@/components/LoginForm";
 import { getSession, hasCustomPassword } from "@/lib/auth";
 
@@ -13,6 +14,7 @@ export default async function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-hero">
+        <HotelBackdrop variant="login" />
         <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
           <div className="brand-mark" style={{ background: "rgba(255,255,255,.12)" }}>
             <Sparkles size={19} />
