@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Mail,
   Network,
+  FileBarChart,
   ScrollText,
   Settings,
   Sparkles,
@@ -44,6 +45,7 @@ export function Sidebar({ interviewBadge }: { interviewBadge?: number }) {
         <NavLink href="/messages" label="邮件中心" icon={<Mail />} />
         <NavLink href="/scheduling" label="排班与考勤" icon={<CalendarClock />} />
         <NavLink href="/performance" label="绩效评估" icon={<Target />} />
+        <NavLink href="/reports" label="报表中心" icon={<FileBarChart />} />
         <NavLink href="/audit" label="审计日志" icon={<ScrollText />} />
       </nav>
 
