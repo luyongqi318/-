@@ -3,6 +3,7 @@
 import { LogOut } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { GlobalSearch } from "./GlobalSearch";
 
 const TITLES: Record<string, string> = {
   "/": "数据看板",
@@ -42,6 +43,7 @@ export function Topbar({ user }: { user: string }) {
           人力资源平台 / <b>{title}</b>
         </span>
       </div>
+      <GlobalSearch />
       <div className="topbar-right">
         <span className="topbar-date" suppressHydrationWarning>
           {date || "—"}
