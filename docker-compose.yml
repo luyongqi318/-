@@ -1,3 +1,5 @@
+# 生产环境编排：一条命令起站（docker compose up -d）
+# 变量放在同目录 .env 里，不要写进这个文件
 services:
   hr:
     build: .
@@ -5,22 +7,26 @@ services:
     container_name: doubletree-hr
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
-      # 登录账号（务必修改）
-      HR_USER: hr
-      HR_PASS: doubletree2026
-      AUTH_SECRET: change-me-to-a-long-random-string
-      # 模型（可留空，留空走本地演示模式；也可在网页「系统设置」里填）
-      DEEPSEEK_API_KEY: ""
-      AGENT_MODEL: deepseek-chat
-      AGENT_BASE_URL: https://api.deepseek.com
       HR_DB_PATH: /app/data/hr.db
+      NODE_ENV: production
     volumes:
       - ./data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 25s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
