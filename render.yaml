@@ -1,5 +1,6 @@
 # Render Blueprint：https://render.com/docs/blueprint-spec
-# 免费计划不支持持久磁盘，SQLite 数据会随重启丢失，建议 Starter 及以上
+# 注意：SQLite 需要持久磁盘，免费计划不支持磁盘，数据会随重启丢失。
+# 正式使用请选 Starter 及以上（$7/月起）。
 services:
   - type: web
     name: doubletree-hr
@@ -8,20 +9,20 @@ services:
     region: singapore
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
-    autoDeploy: false
+    autoDeploy: true
     envVars:
-      - key: DEEPSEEK_API_KEY
-        sync: false
-      - key: AGENT_MODEL
-        value: deepseek-chat
-      - key: AGENT_BASE_URL
-        value: https://api.deepseek.com
       - key: HR_USER
-        sync: false
+        value: hr
       - key: HR_PASS
         sync: false
       - key: AUTH_SECRET
         generateValue: true
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: AGENT_MODEL
+        value: deepseek-flash
+      - key: AGENT_BASE_URL
+        value: https://api.deepseek.com
       - key: HR_DB_PATH
         value: /app/data/hr.db
     disk:
