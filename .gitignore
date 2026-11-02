@@ -4,7 +4,12 @@ out/
 data/
 shots/
 tools/
+backups/
 *.log
+*.db
+*.db-wal
+*.db-shm
+.env
 .env.local
 .env*.local
 .DS_Store
